@@ -1,127 +1,171 @@
-import { Link } from "react-router-dom";
-import AppLayout from "@/components/AppLayout";
-import StatCard from "@/components/StatCard";
-import { Button } from "@/components/ui/button";
-import { Milk, DollarSign, TrendingUp, TrendingDown, PlusCircle, FileText, BarChart3, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { useState } from "react";
+import AppLayout from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Plus, Trash2, Send, Milk } from "lucide-react";
+import { toast } from "sonner";
 
-const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-// Sample data
-const recentRecords = [
-  { date: "2024-03-15", milkAM: 45, milkPM: 42, expenses: 1200, revenue: 3500 },
-  { date: "2024-03-14", milkAM: 43, milkPM: 40, expenses: 800, revenue: 3300 },
-  { date: "2024-03-13", milkAM: 46, milkPM: 44, expenses: 950, revenue: 3600 },
-  { date: "2024-03-12", milkAM: 41, milkPM: 39, expenses: 1100, revenue: 3200 },
-];
+interface DynamicField {
+  id: number;
+  description: string;
+  value: string;
+}
 
 export default function Dashboard() {
-  const [monthIndex, setMonthIndex] = useState(2); // March
-  const year = 2024;
+  const [milkMorning, setMilkMorning] = useState("");
+  const [milkEvening, setMilkEvening] = useState("");
+  const [revenues, setRevenues] = useState<DynamicField[]>([]);
+  const [expenses, setExpenses] = useState<DynamicField[]>([]);
+
+  const addRevenue = () => setRevenues([...revenues, { id: Date.now(), description: "", value: "" }]);
+  const addExpense = () => setExpenses([...expenses, { id: Date.now(), description: "", value: "" }]);
+
+  const removeRevenue = (id: number) => setRevenues(revenues.filter((r) => r.id !== id));
+  const removeExpense = (id: number) => setExpenses(expenses.filter((e) => e.id !== id));
+
+  const updateRevenue = (id: number, field: "description" | "value", val: string) =>
+    setRevenues(revenues.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
+  const updateExpense = (id: number, field: "description" | "value", val: string) =>
+    setExpenses(expenses.map((e) => (e.id === id ? { ...e, [field]: val } : e)));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast.success("Record submitted successfully!");
+  };
 
   return (
     <AppLayout>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Overview of your farm performance</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center glass-card px-2 py-1 gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setMonthIndex(Math.max(0, monthIndex - 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
-              {months[monthIndex]} {year}
-            </span>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setMonthIndex(Math.min(11, monthIndex + 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-6">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary mx-auto mb-3">
+            <Milk className="h-7 w-7 text-primary" />
           </div>
-          <Link to="/new-record">
-            <Button size="sm">
-              <PlusCircle className="h-3.5 w-3.5" />
-              New Record
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Total Milk" value="1,340 L" subtitle="This month" icon={Milk} variant="primary" trend="up" trendValue="5.2% vs last month" />
-        <StatCard title="Revenue" value="₹42,500" subtitle="This month" icon={TrendingUp} variant="accent" trend="up" trendValue="8.1% vs last month" />
-        <StatCard title="Expenses" value="₹18,200" subtitle="This month" icon={TrendingDown} variant="warning" trend="down" trendValue="3.4% vs last month" />
-        <StatCard title="Net Balance" value="₹24,300" subtitle="This month" icon={DollarSign} variant="primary" trend="up" trendValue="12.3% vs last month" />
-      </div>
-
-      {/* Quick Actions + Recent Records */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="glass-card p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Quick Actions</h2>
-          <div className="space-y-2">
-            <Link to="/new-record" className="block">
-              <Button variant="outline" className="w-full justify-start">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Daily Record
-              </Button>
-            </Link>
-            <Link to="/records" className="block">
-              <Button variant="outline" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                View Monthly Records
-              </Button>
-            </Link>
-            <Link to="/reports" className="block">
-              <Button variant="outline" className="w-full justify-start">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Generate Report
-              </Button>
-            </Link>
-            <Link to="/records/update" className="block">
-              <Button variant="outline" className="w-full justify-start">
-                <Calendar className="h-4 w-4 mr-2" />
-                Update Existing Record
-              </Button>
-            </Link>
-          </div>
+          <h1 className="text-2xl font-bold text-foreground">Daily Record Entry</h1>
+          <p className="text-sm text-muted-foreground mt-1">Enter today's milk yield and transactions</p>
         </div>
 
-        {/* Recent Records */}
-        <div className="lg:col-span-2 glass-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Recent Records</h2>
-            <Link to="/records">
-              <Button variant="ghost" size="compact" className="text-muted-foreground">View All</Button>
-            </Link>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Milk Fields */}
+          <div className="glass-card p-5 animate-slide-up">
+            <h2 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">🥛 Milk Yield</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Morning (Liters)</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  placeholder="e.g. 39"
+                  value={milkMorning}
+                  onChange={(e) => setMilkMorning(e.target.value)}
+                  className="h-10 bg-secondary border-border"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Evening (Liters)</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  placeholder="e.g. 48.5"
+                  value={milkEvening}
+                  onChange={(e) => setMilkEvening(e.target.value)}
+                  className="h-10 bg-secondary border-border"
+                  required
+                />
+              </div>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50">
-                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Milk (L)</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Expenses</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revenue</th>
-                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentRecords.map((r, i) => (
-                  <tr key={r.date} className={`border-b border-border/30 hover:bg-secondary/50 transition-colors ${i % 2 === 0 ? "bg-secondary/20" : ""}`}>
-                    <td className="py-2.5 px-3 font-medium text-foreground">{r.date}</td>
-                    <td className="py-2.5 px-3 text-right text-muted-foreground">{r.milkAM + r.milkPM}</td>
-                    <td className="py-2.5 px-3 text-right text-destructive">₹{r.expenses.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right text-primary">₹{r.revenue.toLocaleString()}</td>
-                    <td className="py-2.5 px-3 text-right font-semibold text-foreground">₹{(r.revenue - r.expenses).toLocaleString()}</td>
-                  </tr>
+
+          {/* Revenue Section */}
+          <div className="glass-card p-5 animate-slide-up">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">💰 Revenue</h2>
+              <Button type="button" variant="outline" size="sm" onClick={addRevenue}>
+                <Plus className="h-3.5 w-3.5" /> Add Revenue
+              </Button>
+            </div>
+            {revenues.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-3">No revenue entries. Click "Add Revenue" to add one.</p>
+            ) : (
+              <div className="space-y-3">
+                {revenues.map((r) => (
+                  <div key={r.id} className="flex items-end gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Description</Label>
+                      <Input
+                        placeholder="e.g. Milk sale"
+                        value={r.description}
+                        onChange={(e) => updateRevenue(r.id, "description", e.target.value)}
+                        className="h-9 bg-secondary border-border"
+                      />
+                    </div>
+                    <div className="w-32 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Amount (PKR)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={r.value}
+                        onChange={(e) => updateRevenue(r.id, "value", e.target.value)}
+                        className="h-9 bg-secondary border-border"
+                      />
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => removeRevenue(r.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        </div>
+
+          {/* Expense Section */}
+          <div className="glass-card p-5 animate-slide-up">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">📉 Expenses</h2>
+              <Button type="button" variant="outline" size="sm" onClick={addExpense}>
+                <Plus className="h-3.5 w-3.5" /> Add Expense
+              </Button>
+            </div>
+            {expenses.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-3">No expense entries. Click "Add Expense" to add one.</p>
+            ) : (
+              <div className="space-y-3">
+                {expenses.map((exp) => (
+                  <div key={exp.id} className="flex items-end gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Description</Label>
+                      <Input
+                        placeholder="e.g. Feed purchase"
+                        value={exp.description}
+                        onChange={(e) => updateExpense(exp.id, "description", e.target.value)}
+                        className="h-9 bg-secondary border-border"
+                      />
+                    </div>
+                    <div className="w-32 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Amount (PKR)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={exp.value}
+                        onChange={(e) => updateExpense(exp.id, "value", e.target.value)}
+                        className="h-9 bg-secondary border-border"
+                      />
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => removeExpense(exp.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Submit */}
+          <Button type="submit" className="w-full h-11">
+            <Send className="h-4 w-4" /> Submit Record
+          </Button>
+        </form>
       </div>
     </AppLayout>
   );

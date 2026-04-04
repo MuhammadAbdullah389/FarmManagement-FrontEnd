@@ -25,11 +25,11 @@ const App = () => (
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/new-record" element={<NewRecord />} />
           <Route path="/records" element={<Records />} />
           <Route path="/records/update" element={<UpdateChoice />} />
+          <Route path="/records/update/existing" element={<NewRecord />} />
+          <Route path="/records/update/new" element={<NewRecord />} />
           <Route path="/records/:id" element={<RecordDetail />} />
-          <Route path="/records/:id/edit" element={<NewRecord />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="*" element={<NotFound />} />
