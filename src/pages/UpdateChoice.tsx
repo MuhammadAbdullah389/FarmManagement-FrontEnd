@@ -1,21 +1,10 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Calendar, Search, Edit } from "lucide-react";
+import { Edit, PlusCircle } from "lucide-react";
 
 export default function UpdateChoice() {
   const navigate = useNavigate();
-  const [date, setDate] = useState("");
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (date) {
-      navigate(`/records/1/edit`);
-    }
-  };
 
   return (
     <AppLayout>
@@ -24,28 +13,40 @@ export default function UpdateChoice() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary mx-auto mb-4">
             <Edit className="h-7 w-7 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Update Record</h1>
-          <p className="text-sm text-muted-foreground mt-1">Select a date to find and update an existing record</p>
+          <h1 className="text-2xl font-bold text-foreground">Update a Record</h1>
+          <p className="text-sm text-muted-foreground mt-1">Choose what you'd like to do</p>
         </div>
 
-        <div className="glass-card p-6 animate-slide-up">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5" /> Select Date
-              </Label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="h-10 bg-secondary border-border"
-                required
-              />
+        <div className="space-y-4 animate-slide-up">
+          <button
+            onClick={() => navigate("/records/update/existing")}
+            className="glass-card p-6 w-full text-left hover:border-primary/50 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary group-hover:bg-primary/20 transition-colors">
+                <Edit className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Change Existing Record</h3>
+                <p className="text-sm text-muted-foreground">Edit an already saved entry by date</p>
+              </div>
             </div>
-            <Button type="submit" className="w-full">
-              <Search className="h-4 w-4" /> Find Record
-            </Button>
-          </form>
+          </button>
+
+          <button
+            onClick={() => navigate("/records/update/new")}
+            className="glass-card p-6 w-full text-left hover:border-accent/50 transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary group-hover:bg-accent/20 transition-colors">
+                <PlusCircle className="h-6 w-6 text-accent" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Insert New Record</h3>
+                <p className="text-sm text-muted-foreground">Create a new entry for the current month only</p>
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     </AppLayout>
