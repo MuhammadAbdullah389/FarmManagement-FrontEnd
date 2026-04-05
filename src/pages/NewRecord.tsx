@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Save, Calendar, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 interface DynamicField {
   id: number;
@@ -16,12 +17,19 @@ interface DynamicField {
 export default function NewRecord() {
   const location = useLocation();
   const isExisting = location.pathname.includes("/existing");
+  const currentMonth = new Date();
+  const currentMonthMin = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-01`;
+  const currentMonthMax = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate().toString().padStart(2, "0")}`;
 
   const [date, setDate] = useState("");
   const [milkMorning, setMilkMorning] = useState("0");
   const [milkEvening, setMilkEvening] = useState("0");
   const [expenses, setExpenses] = useState<DynamicField[]>([]);
   const [revenues, setRevenues] = useState<DynamicField[]>([]);
+  const [checkingDate, setCheckingDate] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [recordExists, setRecordExists] = useState<boolean | null>(null);
+  const [resolvedDate, setResolvedDate] = useState("");
 
   const addExpense = () => setExpenses([...expenses, { id: Date.now(), description: "", value: "" }]);
   const addRevenue = () => setRevenues([...revenues, { id: Date.now(), description: "", value: "" }]);
@@ -32,9 +40,101 @@ export default function NewRecord() {
   const updateRevenue = (id: number, field: "description" | "value", val: string) =>
     setRevenues(revenues.map((r) => (r.id === id ? { ...r, [field]: val } : r)));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isExisting || !date) {
+      setRecordExists(null);
+      return;
+    }
+
+    let active = true;
+
+    const checkAndLoadRecord = async () => {
+      setCheckingDate(true);
+      try {
+        const resolved = await api.resolveDate(date);
+        if (!active) return;
+
+        setRecordExists(true);
+        setResolvedDate(resolved.formattedDate);
+
+        const record = await api.getRecord(resolved.formattedDate);
+        if (!active) return;
+
+        setMilkMorning(String(record.morningMilk));
+        setMilkEvening(String(record.eveningMilk));
+        setExpenses(
+          (record.expenses || []).map((item) => ({
+            id: Date.now() + Math.random(),
+            description: item.description,
+            value: String(item.amount),
+          })),
+        );
+        setRevenues(
+          (record.revenues || []).map((item) => ({
+            id: Date.now() + Math.random(),
+            description: item.description,
+            value: String(item.amount),
+          })),
+        );
+      } catch (err) {
+        if (!active) return;
+        setRecordExists(false);
+        setResolvedDate("");
+        setMilkMorning("0");
+        setMilkEvening("0");
+        setExpenses([]);
+        setRevenues([]);
+        toast.error(err instanceof Error ? err.message : "Unable to load record for selected date");
+      } finally {
+        if (active) {
+          setCheckingDate(false);
+        }
+      }
+    };
+
+    checkAndLoadRecord();
+    return () => {
+      active = false;
+    };
+  }, [date, isExisting]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success(isExisting ? "Record updated successfully!" : "New record inserted!");
+
+    const payload = {
+      morningMilk: Number(milkMorning || 0),
+      eveningMilk: Number(milkEvening || 0),
+      expenses: expenses
+        .filter((item) => item.description.trim() && item.value !== "")
+        .map((item) => ({ description: item.description.trim(), amount: Number(item.value) })),
+      revenues: revenues
+        .filter((item) => item.description.trim() && item.value !== "")
+        .map((item) => ({ description: item.description.trim(), amount: Number(item.value) })),
+    };
+
+    setSubmitting(true);
+    try {
+      if (isExisting) {
+        if (recordExists === false || !resolvedDate) {
+          toast.error("No existing record found for this date");
+          return;
+        }
+
+        const result = await api.updateRecord(resolvedDate, payload);
+        toast.success(result.message || "Record updated successfully!");
+      } else {
+        const eligibility = await api.checkNewDate(date);
+        const result = await api.createRecord({
+          ...payload,
+          recordDate: eligibility.selectedDate,
+        });
+        toast.success(result.message || "New record inserted!");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to save record");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const title = isExisting
@@ -58,9 +158,20 @@ export default function NewRecord() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              min={!isExisting ? currentMonthMin : undefined}
+              max={!isExisting ? currentMonthMax : undefined}
               className="max-w-xs h-10 bg-secondary border-border"
               required
             />
+            {isExisting && date && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {checkingDate
+                  ? "Checking existing record..."
+                  : recordExists
+                    ? "Record found. You can update it."
+                    : "No record exists for this date."}
+              </p>
+            )}
           </div>
 
           {/* Milk + Expenses + Revenue in one card like the screenshot */}
@@ -166,8 +277,8 @@ export default function NewRecord() {
                 <Button type="button" size="sm" className="bg-orange-500 hover:bg-orange-600 text-white" onClick={addRevenue}>
                   <Plus className="h-3.5 w-3.5" /> Add Revenue
                 </Button>
-                <Button type="submit" size="sm">
-                  <Save className="h-3.5 w-3.5" /> {isExisting ? "Update Record" : "Submit Record"}
+                <Button type="submit" size="sm" disabled={submitting || checkingDate || (isExisting && recordExists === false)}>
+                  <Save className="h-3.5 w-3.5" /> {submitting ? "Saving..." : isExisting ? "Update Record" : "Submit Record"}
                 </Button>
               </div>
             </div>

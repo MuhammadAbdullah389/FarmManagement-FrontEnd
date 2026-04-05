@@ -1,41 +1,94 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Eye, FileText } from "lucide-react";
+import { api, type RecordSummary } from "@/lib/api";
+import { toast } from "sonner";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-const sampleRecords = [
-  { id: 1, date: "01/03/2026", milkMorning: 39, milkEvening: 48.5, totalExpenses: 25000, totalRevenue: 12250, balance: -12750 },
-  { id: 2, date: "02/03/2026", milkMorning: 42, milkEvening: 45, totalExpenses: 1200, totalRevenue: 14500, balance: 13300 },
-  { id: 3, date: "03/03/2026", milkMorning: 40, milkEvening: 47, totalExpenses: 800, totalRevenue: 13800, balance: 13000 },
-  { id: 4, date: "04/03/2026", milkMorning: 38, milkEvening: 44, totalExpenses: 3500, totalRevenue: 12600, balance: 9100 },
-  { id: 5, date: "05/03/2026", milkMorning: 41, milkEvening: 46, totalExpenses: 950, totalRevenue: 14200, balance: 13250 },
-];
+function formatDisplayDate(dateValue: string) {
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return dateValue;
+  return parsed.toLocaleDateString("en-GB");
+}
 
 export default function Records() {
-  const [monthIndex, setMonthIndex] = useState(2); // March
-  const year = 2026;
+  const now = new Date();
+  const [monthIndex, setMonthIndex] = useState(now.getMonth());
+  const [year, setYear] = useState(now.getFullYear());
+  const [records, setRecords] = useState<RecordSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadRecords = async () => {
+      setLoading(true);
+      try {
+        const data = await api.getRecords(monthIndex + 1, year);
+        if (active) {
+          setRecords(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        if (active) {
+          setRecords([]);
+          toast.error(err instanceof Error ? err.message : "Unable to load records");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRecords();
+    return () => {
+      active = false;
+    };
+  }, [monthIndex, year]);
+
+  const goPrevMonth = () => {
+    if (monthIndex === 0) {
+      setMonthIndex(11);
+      setYear((prev) => prev - 1);
+      return;
+    }
+    setMonthIndex((prev) => prev - 1);
+  };
+
+  const goNextMonth = () => {
+    if (monthIndex === 11) {
+      setMonthIndex(0);
+      setYear((prev) => prev + 1);
+      return;
+    }
+    setMonthIndex((prev) => prev + 1);
+  };
 
   return (
     <AppLayout>
       {/* Month Navigation */}
       <div className="flex items-center justify-center gap-3 mb-8">
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-accent" onClick={() => setMonthIndex(Math.max(0, monthIndex - 1))}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-accent" onClick={goPrevMonth}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <span className="text-lg font-semibold text-accent min-w-[160px] text-center">
           {months[monthIndex]} {year}
         </span>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-accent" onClick={() => setMonthIndex(Math.min(11, monthIndex + 1))}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-accent" onClick={goNextMonth}>
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
 
       <h2 className="text-xl font-bold text-foreground text-center mb-6">Entries Table</h2>
 
-      {sampleRecords.length === 0 ? (
+      {loading ? (
+        <div className="glass-card p-12 text-center animate-fade-in">
+          <h3 className="text-lg font-semibold text-foreground mb-2">Loading records...</h3>
+        </div>
+      ) : records.length === 0 ? (
         <div className="glass-card p-12 text-center animate-fade-in">
           <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No records found</h3>
@@ -43,9 +96,9 @@ export default function Records() {
         </div>
       ) : (
         <div className="space-y-8">
-          {sampleRecords.map((r) => (
-            <div key={r.id} className="animate-slide-up">
-              <h3 className="text-lg font-bold text-accent text-center mb-3">{r.date}</h3>
+          {records.map((r) => (
+            <div key={r.date} className="animate-slide-up">
+              <h3 className="text-lg font-bold text-accent text-center mb-3">{formatDisplayDate(r.date)}</h3>
               <div className="glass-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -71,7 +124,7 @@ export default function Records() {
                 </div>
               </div>
               <div className="mt-2">
-                <Link to={`/records/${r.id}`}>
+                <Link to={`/records/${encodeURIComponent(r.date)}`}>
                   <Button variant="default" size="sm" className="gradient-primary">
                     <Eye className="h-3.5 w-3.5" /> View Details
                   </Button>

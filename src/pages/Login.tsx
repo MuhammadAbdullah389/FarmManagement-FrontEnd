@@ -4,21 +4,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Milk, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.username || !form.password) {
+    if (!form.email || !form.password) {
       setError("Please fill in all fields");
       return;
     }
+
+    setSubmitting(true);
     setError("");
-    navigate("/dashboard");
+
+    try {
+      const response = await api.login(form);
+      localStorage.setItem("auth_user", JSON.stringify(response.user));
+
+      navigate("/dashboard");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to sign in";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -29,8 +44,8 @@ export default function Login() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl gradient-primary mb-4 shadow-lg shadow-primary/20">
             <Milk className="h-7 w-7 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-gradient">FarmFlow</h1>
-          <p className="text-sm text-muted-foreground mt-1">Farm Management System</p>
+          <h1 className="text-2xl font-bold text-gradient">Advanced FMS</h1>
+          <p className="text-sm text-muted-foreground mt-1">Farm Management Dashboard</p>
         </div>
 
         {/* Login Card */}
@@ -47,12 +62,13 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm text-muted-foreground">Username</Label>
+              <Label htmlFor="email" className="text-sm text-muted-foreground">Email</Label>
               <Input
-                id="username"
-                placeholder="Enter your username"
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="h-10 bg-secondary border-border focus:border-primary focus:ring-primary/20"
               />
             </div>
@@ -76,14 +92,14 @@ export default function Login() {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full" size="lg">
-              Sign In
+            <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+              {submitting ? "Signing In..." : "Sign In"}
             </Button>
           </form>
         </div>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
-          © 2024 FarmFlow. All rights reserved.
+          © 2026 Advanced FMS.
         </p>
       </div>
     </div>

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Send, Milk } from "lucide-react";
+import { Plus, Trash2, Send, Milk, AlertCircle, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 interface DynamicField {
   id: number;
@@ -17,6 +19,35 @@ export default function Dashboard() {
   const [milkEvening, setMilkEvening] = useState("");
   const [revenues, setRevenues] = useState<DynamicField[]>([]);
   const [expenses, setExpenses] = useState<DynamicField[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [recordExistsForToday, setRecordExistsForToday] = useState<boolean | null>(null);
+  const [todayDateFormatted, setTodayDateFormatted] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const checkTodayRecord = async () => {
+      try {
+        const today = new Date();
+        const formatted = today.toLocaleDateString("en-GB");
+        setTodayDateFormatted(formatted);
+
+        const record = await api.getRecord(formatted);
+        if (active) {
+          setRecordExistsForToday(true);
+        }
+      } catch (err) {
+        if (active) {
+          setRecordExistsForToday(false);
+        }
+      }
+    };
+
+    checkTodayRecord();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const addRevenue = () => setRevenues([...revenues, { id: Date.now(), description: "", value: "" }]);
   const addExpense = () => setExpenses([...expenses, { id: Date.now(), description: "", value: "" }]);
@@ -29,9 +60,32 @@ export default function Dashboard() {
   const updateExpense = (id: number, field: "description" | "value", val: string) =>
     setExpenses(expenses.map((e) => (e.id === id ? { ...e, [field]: val } : e)));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Record submitted successfully!");
+
+    const payload = {
+      morningMilk: Number(milkMorning || 0),
+      eveningMilk: Number(milkEvening || 0),
+      expenses: expenses
+        .filter((item) => item.description.trim() && item.value !== "")
+        .map((item) => ({ description: item.description.trim(), amount: Number(item.value) })),
+      revenues: revenues
+        .filter((item) => item.description.trim() && item.value !== "")
+        .map((item) => ({ description: item.description.trim(), amount: Number(item.value) })),
+    };
+
+    setSubmitting(true);
+    try {
+      const response = await api.createRecord(payload);
+      toast.success(response.message || "Record submitted successfully!");
+      setExpenses([]);
+      setRevenues([]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to submit record";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -45,6 +99,32 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground mt-1">Enter today's milk yield and transactions</p>
         </div>
 
+        {recordExistsForToday === null && (
+          <div className="glass-card p-6 text-center animate-fade-in">
+            <h2 className="text-lg font-semibold text-foreground">Checking today's record...</h2>
+          </div>
+        )}
+
+        {recordExistsForToday === true && (
+          <div className="glass-card p-6 animate-fade-in border border-orange-500/30 bg-orange-500/5">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="h-6 w-6 text-orange-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-foreground mb-1">Record Already Exists</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  A record for today ({todayDateFormatted}) has already been created. You can edit or update it below.
+                </p>
+                <Link to="/records/update/existing">
+                  <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                    <Edit className="h-4 w-4 mr-2" /> Edit Today's Record
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {recordExistsForToday === false && (
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Milk Fields */}
           <div className="glass-card p-5 animate-slide-up">
@@ -162,10 +242,11 @@ export default function Dashboard() {
           </div>
 
           {/* Submit */}
-          <Button type="submit" className="w-full h-11">
-            <Send className="h-4 w-4" /> Submit Record
+          <Button type="submit" className="w-full h-11" disabled={submitting}>
+            <Send className="h-4 w-4" /> {submitting ? "Submitting..." : "Submit Record"}
           </Button>
         </form>
+        )}
       </div>
     </AppLayout>
   );

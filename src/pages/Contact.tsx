@@ -9,8 +9,8 @@ export default function Contact() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary mx-auto mb-4">
             <User className="h-7 w-7 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Contact the Developer</h1>
-          <p className="text-sm text-muted-foreground mt-1">Muhammad Abdullah</p>
+          <h1 className="text-2xl font-bold text-foreground">Support</h1>
+          <p className="text-sm text-muted-foreground mt-1">Reach the farm management support team</p>
         </div>
 
         <div className="glass-card p-6 space-y-4 animate-slide-up">

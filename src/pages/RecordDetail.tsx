@@ -1,25 +1,69 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { api, type RecordDetail as RecordDetailModel } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function RecordDetail() {
-  const { id } = useParams();
+  const { date } = useParams();
+  const postingDate = date ? decodeURIComponent(date) : "";
+  const [record, setRecord] = useState<RecordDetailModel | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Sample data matching the actual system structure
-  const record = {
-    date: "01/03/2026",
-    milkMorning: 39,
-    milkEvening: 48.5,
-    expenses: [
-      { description: "Payment to Dr sb for missa", amount: 25000 },
-    ],
-    revenues: [] as { description: string; amount: number }[],
-    milkRate: 140,
-  };
+  useEffect(() => {
+    if (!postingDate) return;
+    let active = true;
 
-  const totalMilk = record.milkMorning + record.milkEvening;
-  const milkRevenue = totalMilk * record.milkRate;
+    const loadRecord = async () => {
+      setLoading(true);
+      try {
+        const data = await api.getRecord(postingDate);
+        if (active) {
+          setRecord(data);
+        }
+      } catch (err) {
+        if (active) {
+          setRecord(null);
+          toast.error(err instanceof Error ? err.message : "Unable to load record details");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRecord();
+    return () => {
+      active = false;
+    };
+  }, [postingDate]);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-xl font-semibold text-foreground">Loading record details...</h1>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!record) {
+    return (
+      <AppLayout>
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-xl font-semibold text-foreground">Record not found</h1>
+          <p className="text-sm text-muted-foreground mt-2">No record exists for this date.</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const totalMilk = record.morningMilk + record.eveningMilk;
+  const milkRevenue = totalMilk * (record.milkRate ?? 0);
   const otherRevenue = record.revenues.reduce((sum, r) => sum + r.amount, 0);
   const totalRevenue = milkRevenue + otherRevenue;
   const totalExpenses = record.expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -52,8 +96,8 @@ export default function RecordDetail() {
               </thead>
               <tbody>
                 <tr className="border-t border-border/30">
-                  <td className="py-2.5 px-4 text-foreground">{record.milkMorning} liters</td>
-                  <td className="py-2.5 px-4 text-foreground">{record.milkEvening} liters</td>
+                  <td className="py-2.5 px-4 text-foreground">{record.morningMilk} liters</td>
+                  <td className="py-2.5 px-4 text-foreground">{record.eveningMilk} liters</td>
                 </tr>
               </tbody>
             </table>

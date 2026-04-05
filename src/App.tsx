@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,26 +13,77 @@ import Reports from "./pages/Reports";
 import Contact from "./pages/Contact";
 import UpdateChoice from "./pages/UpdateChoice";
 import NotFound from "./pages/NotFound";
+import { api } from "@/lib/api";
 
 const queryClient = new QueryClient();
+
+type RequiredRole = "admin";
+
+function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: RequiredRole }) {
+  const [checking, setChecking] = useState(true);
+  const [authorized, setAuthorized] = useState(Boolean(localStorage.getItem("auth_user")));
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const checkAuth = async () => {
+      try {
+        const user = await api.getCurrentUser();
+        if (!active) return;
+        localStorage.setItem("auth_user", JSON.stringify(user));
+        setAuthorized(true);
+        setCurrentRole(user.role);
+      } catch {
+        if (!active) return;
+        localStorage.removeItem("auth_user");
+        setAuthorized(false);
+        setCurrentRole(null);
+      } finally {
+        if (active) {
+          setChecking(false);
+        }
+      }
+    };
+
+    checkAuth();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (checking) {
+    return null;
+  }
+
+  if (!authorized) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requiredRole && currentRole !== requiredRole) {
+    return <Navigate to="/records" replace />;
+  }
+
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/records" element={<Records />} />
-          <Route path="/records/update" element={<UpdateChoice />} />
-          <Route path="/records/update/existing" element={<NewRecord />} />
-          <Route path="/records/update/new" element={<NewRecord />} />
-          <Route path="/records/:id" element={<RecordDetail />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/contact" element={<Contact />} />
+          <Route path="/dashboard" element={<ProtectedRoute requiredRole="admin"><Dashboard /></ProtectedRoute>} />
+          <Route path="/records" element={<ProtectedRoute><Records /></ProtectedRoute>} />
+          <Route path="/records/update" element={<ProtectedRoute requiredRole="admin"><UpdateChoice /></ProtectedRoute>} />
+          <Route path="/records/update/existing" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
+          <Route path="/records/update/new" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
+          <Route path="/records/:date" element={<ProtectedRoute><RecordDetail /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
