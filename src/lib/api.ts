@@ -86,6 +86,11 @@ export interface MonthlyReportResponse {
   summary: MonthlyReportSummary;
 }
 
+export interface DownloadedPdf {
+  blob: Blob;
+  filename: string;
+}
+
 function toMoneyMap(items: LineItem[]) {
   return items.reduce<Record<string, LineItem>>((acc, item, idx) => {
     acc[`item_${idx + 1}`] = {
@@ -139,6 +144,54 @@ function toReportRows(records: DailyRecordRaw[]): MonthlyReportRow[] {
       balance: Number(entry.Balance || totalRev - totalExp),
     };
   });
+}
+
+const MONTH_INDEX: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
+function parseMonthYear(input: string): { month: number; year: number } | null {
+  const normalized = input.trim().toLowerCase();
+
+  const byLabel = normalized.match(/^([a-z]+)\s+(\d{4})$/);
+  if (byLabel) {
+    const month = MONTH_INDEX[byLabel[1]];
+    const year = Number(byLabel[2]);
+    if (month && year >= 1900) {
+      return { month, year };
+    }
+  }
+
+  const byNumbers = normalized.match(/^(\d{1,2})[\s\/-](\d{4})$/);
+  if (byNumbers) {
+    const month = Number(byNumbers[1]);
+    const year = Number(byNumbers[2]);
+    if (month >= 1 && month <= 12 && year >= 1900) {
+      return { month, year };
+    }
+  }
+
+  const byIso = normalized.match(/^(\d{4})-(\d{1,2})$/);
+  if (byIso) {
+    const year = Number(byIso[1]);
+    const month = Number(byIso[2]);
+    if (month >= 1 && month <= 12 && year >= 1900) {
+      return { month, year };
+    }
+  }
+
+  return null;
 }
 
 async function requestEnvelope<T>(
@@ -269,6 +322,55 @@ export const api = {
 
   getMonthlyReportPdfUrl(monthLabelOrCode: string) {
     const base = getApiBaseUrl();
+    const parsed = parseMonthYear(monthLabelOrCode);
+    if (parsed) {
+      return `${base}/api/reports/${parsed.month}/${parsed.year}/pdf`;
+    }
     return `${base}/api/reports/${encodeURIComponent(monthLabelOrCode)}/pdf`;
+  },
+
+  async downloadMonthlyReportPdf(monthLabelOrCode: string): Promise<DownloadedPdf> {
+    const token = localStorage.getItem("auth_token");
+    const base = getApiBaseUrl();
+    const parsed = parseMonthYear(monthLabelOrCode);
+    const urls = parsed
+      ? [
+        `${base}/api/reports/${parsed.month}/${parsed.year}/pdf`,
+        `${base}/api/reports/${encodeURIComponent(monthLabelOrCode)}/pdf`,
+      ]
+      : [`${base}/api/reports/${encodeURIComponent(monthLabelOrCode)}/pdf`];
+
+    let response: Response | null = null;
+    for (const url of urls) {
+      const candidate = await fetch(url, {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (candidate.ok) {
+        response = candidate;
+        break;
+      }
+
+      if (candidate.status !== 404) {
+        const message = await candidate.text();
+        throw new Error(message || `Failed to download PDF (status ${candidate.status})`);
+      }
+    }
+
+    if (!response) {
+      throw new Error("Monthly report PDF was not found for this month.");
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") || "";
+    const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+    const encodedFilename = filenameMatch?.[1];
+    const plainFilename = filenameMatch?.[2];
+
+    return {
+      blob,
+      filename: decodeURIComponent(encodedFilename || plainFilename || `monthly-report-${monthLabelOrCode}.pdf`),
+    };
   },
 };

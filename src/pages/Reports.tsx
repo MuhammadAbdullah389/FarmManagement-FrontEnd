@@ -1,15 +1,107 @@
 import { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { api, type MonthlyReportResponse } from "@/lib/api";
 import { toast } from "sonner";
+
+function formatCurrency(value: number) {
+  return `${value.toLocaleString()} PKR`;
+}
+
+async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+
+  doc.setFillColor(15, 76, 117);
+  doc.rect(0, 0, pageWidth, 90, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(24);
+  doc.text("Advanced FMS Monthly Report", margin, 44);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text(`Month: ${monthLabel}`, margin, 68);
+
+  doc.setTextColor(22, 28, 36);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Summary", margin, 122);
+
+  const summaryItems = [
+    { label: "Opening Balance", value: formatCurrency(report.summary.openingBalance) },
+    { label: "Net Balance", value: formatCurrency(report.summary.netBalance) },
+    { label: "Closing Balance", value: formatCurrency(report.summary.closingBalance) },
+    { label: "Total Revenue", value: formatCurrency(report.totals.totalRev) },
+    { label: "Total Expenses", value: formatCurrency(report.totals.totalExp) },
+    { label: "Total Milk", value: `${report.totals.totalMilk.toLocaleString()} liters` },
+  ];
+
+  const cardWidth = (pageWidth - margin * 2 - 16) / 3;
+  const cardHeight = 58;
+  summaryItems.forEach((item, index) => {
+    const row = Math.floor(index / 3);
+    const col = index % 3;
+    const x = margin + col * (cardWidth + 8);
+    const y = 132 + row * (cardHeight + 10);
+    doc.setFillColor(245, 248, 251);
+    doc.roundedRect(x, y, cardWidth, cardHeight, 8, 8, "F");
+    doc.setTextColor(91, 101, 118);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(item.label, x + 12, y + 20);
+    doc.setTextColor(22, 28, 36);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(item.value, x + 12, y + 40);
+  });
+
+  autoTable(doc, {
+    startY: 272,
+    margin: { left: margin, right: margin },
+    head: [["Date", "Milk (L)", "Revenue by Milk", "Other Revenue", "Total Revenue", "Total Expenses", "Net Balance"]],
+    body: report.rows.map((row) => [
+      row.date,
+      row.totalMilk.toLocaleString(),
+      formatCurrency(row.revByMilk),
+      formatCurrency(row.otherRev),
+      formatCurrency(row.totalRev),
+      formatCurrency(row.totalExp),
+      formatCurrency(row.balance),
+    ]),
+    foot: [[
+      "TOTAL",
+      report.totals.totalMilk.toLocaleString(),
+      formatCurrency(report.totals.totalRevMilk),
+      formatCurrency(report.totals.totalOtherRev),
+      formatCurrency(report.totals.totalRev),
+      formatCurrency(report.totals.totalExp),
+      formatCurrency(report.summary.netBalance),
+    ]],
+    theme: "striped",
+    headStyles: { fillColor: [15, 76, 117], textColor: 255, fontStyle: "bold" },
+    footStyles: { fillColor: [227, 239, 247], textColor: [15, 76, 117], fontStyle: "bold" },
+    styles: { fontSize: 9, cellPadding: 5 },
+    alternateRowStyles: { fillColor: [249, 251, 253] },
+    bodyStyles: { textColor: [34, 39, 46] },
+  });
+
+  const filename = `monthly-report-${monthLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  doc.save(filename);
+}
 
 export default function Reports() {
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [report, setReport] = useState<MonthlyReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +176,27 @@ export default function Reports() {
     };
   }, [report]);
 
+  const handleDownloadPdf = async () => {
+    if (!selectedMonth) return;
+
+    setDownloadingPdf(true);
+    try {
+      if (loading) {
+        throw new Error("Please wait for the report to finish loading.");
+      }
+      if (!safeReport.rows.length) {
+        throw new Error("No report data available to generate a PDF.");
+      }
+
+      await buildMonthlyPdf(selectedMonth, safeReport);
+      toast.success("Monthly PDF downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to download monthly report PDF");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   if (!selectedMonth) {
     return (
       <AppLayout>
@@ -111,8 +224,16 @@ export default function Reports() {
         <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(null)} className="text-muted-foreground mb-3">
           <ArrowLeft className="h-4 w-4" /> Back to Months
         </Button>
-        <h1 className="text-2xl font-bold text-foreground">Monthly Entry Report</h1>
-        <p className="text-sm text-accent font-medium">Month: {selectedMonth}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Monthly Entry Report</h1>
+            <p className="text-sm text-accent font-medium">Month: {selectedMonth}</p>
+          </div>
+          <Button onClick={handleDownloadPdf} disabled={downloadingPdf} className="sm:min-w-[180px]">
+            <Download className="h-4 w-4" />
+            {downloadingPdf ? "Downloading PDF..." : "Download PDF"}
+          </Button>
+        </div>
       </div>
 
       {/* Monthly Records Table */}
