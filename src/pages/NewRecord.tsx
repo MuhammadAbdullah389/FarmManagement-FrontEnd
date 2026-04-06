@@ -17,11 +17,12 @@ interface DynamicField {
 export default function NewRecord() {
   const location = useLocation();
   const isExisting = location.pathname.includes("/existing");
+  const prefillDate = (location.state as { prefillDate?: string } | null)?.prefillDate || "";
   const currentMonth = new Date();
   const currentMonthMin = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-01`;
   const currentMonthMax = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate().toString().padStart(2, "0")}`;
 
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(prefillDate);
   const [milkMorning, setMilkMorning] = useState("0");
   const [milkEvening, setMilkEvening] = useState("0");
   const [expenses, setExpenses] = useState<DynamicField[]>([]);
@@ -160,6 +161,7 @@ export default function NewRecord() {
               onChange={(e) => setDate(e.target.value)}
               min={!isExisting ? currentMonthMin : undefined}
               max={!isExisting ? currentMonthMax : undefined}
+              disabled={isExisting && Boolean(prefillDate)}
               className="max-w-xs h-10 bg-secondary border-border"
               required
             />

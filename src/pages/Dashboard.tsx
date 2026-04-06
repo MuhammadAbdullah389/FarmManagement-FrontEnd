@@ -23,6 +23,14 @@ export default function Dashboard() {
   const [recordExistsForToday, setRecordExistsForToday] = useState<boolean | null>(null);
   const [todayDateFormatted, setTodayDateFormatted] = useState("");
 
+  const getTodayInputDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -114,7 +122,7 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground mb-4">
                   A record for today ({todayDateFormatted}) has already been created. You can edit or update it below.
                 </p>
-                <Link to="/records/update/existing">
+                <Link to="/records/update/existing" state={{ prefillDate: getTodayInputDate() }}>
                   <Button className="bg-orange-500 hover:bg-orange-600 text-white">
                     <Edit className="h-4 w-4 mr-2" /> Edit Today's Record
                   </Button>

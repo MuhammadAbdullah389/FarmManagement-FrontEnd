@@ -24,7 +24,7 @@ export interface LineItem {
   amount: number;
 }
 
-interface DailyRecordRaw {
+export interface DailyRecordRaw {
   date: string;
   morningMilkQuantity: number;
   eveningMilkQuantity: number;
@@ -75,6 +75,7 @@ export interface MonthlyReportSummary {
 }
 
 export interface MonthlyReportResponse {
+  records: DailyRecordRaw[];
   rows: MonthlyReportRow[];
   totals: {
     totalMilk: number;
@@ -291,6 +292,7 @@ export const api = {
       records: DailyRecordRaw[];
       monthlyRep: Record<string, unknown> | null;
     }>(`/api/reports/${encodeURIComponent(monthLabelOrCode)}`).then((res) => {
+      const records = res.data.records || [];
       const rows = toReportRows(res.data.records || []);
       const totals = rows.reduce(
         (acc, row) => ({
@@ -309,6 +311,7 @@ export const api = {
       const closingBalance = Number((monthlyRep as { closingBalance?: number }).closingBalance || (openingBalance + netBalance));
 
       return {
+        records,
         rows,
         totals,
         summary: {
