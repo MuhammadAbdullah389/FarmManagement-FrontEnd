@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download } from "lucide-react";
-import { api, type DailyRecordRaw, type MonthlyReportResponse } from "@/lib/api";
+import { api, type MonthlyReportResponse } from "@/lib/api";
 import { toast } from "sonner";
 
 function formatCurrency(value: number) {
@@ -11,25 +11,6 @@ function formatCurrency(value: number) {
 
 function sumLineItems(items: { amount: number }[]) {
   return items.reduce((total, item) => total + Number(item.amount || 0), 0);
-}
-
-function formatDayRecord(record: DailyRecordRaw) {
-  const morning = Number(record.morningMilkQuantity || 0);
-  const evening = Number(record.eveningMilkQuantity || 0);
-  const totalMilk = morning + evening;
-  const milkRevenue = totalMilk * Number(record.milkPrice || 0);
-  const revenueTotal = Number(record.totalRevenue || 0);
-  const expenseTotal = Number(record.totalExpenditure || 0);
-
-  return {
-    date: record.date,
-    totalMilk,
-    milkRevenue,
-    otherRevenue: revenueTotal - milkRevenue,
-    revenueTotal,
-    expenseTotal,
-    balance: Number(record.Balance || revenueTotal - expenseTotal),
-  };
 }
 
 async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse) {
@@ -113,48 +94,10 @@ async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse
     styles: { fontSize: 9, cellPadding: 5 },
     alternateRowStyles: { fillColor: [249, 251, 253] },
     bodyStyles: { textColor: [34, 39, 46] },
+    showFoot: "lastPage",
   });
 
-  const dailyDetailsStart = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 272;
-  doc.setTextColor(22, 28, 36);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("Day-wise Financial Details", margin, dailyDetailsStart + 28);
-
-  autoTable(doc, {
-    startY: dailyDetailsStart + 38,
-    margin: { left: margin, right: margin },
-    head: [["Date", "Milk (L)", "Milk Revenue", "Other Revenue", "Total Revenue", "Expenses", "Net Balance"]],
-    body: report.records.map((record) => {
-      const summary = formatDayRecord(record);
-      return [
-        summary.date,
-        summary.totalMilk.toLocaleString(),
-        formatCurrency(summary.milkRevenue),
-        formatCurrency(summary.otherRevenue),
-        formatCurrency(summary.revenueTotal),
-        formatCurrency(summary.expenseTotal),
-        formatCurrency(summary.balance),
-      ];
-    }),
-    foot: [[
-      "TOTAL",
-      report.totals.totalMilk.toLocaleString(),
-      formatCurrency(report.totals.totalRevMilk),
-      formatCurrency(report.totals.totalOtherRev),
-      formatCurrency(report.totals.totalRev),
-      formatCurrency(report.totals.totalExp),
-      formatCurrency(report.summary.netBalance),
-    ]],
-    theme: "striped",
-    headStyles: { fillColor: [15, 76, 117], textColor: 255, fontStyle: "bold" },
-    footStyles: { fillColor: [227, 239, 247], textColor: [15, 76, 117], fontStyle: "bold" },
-    styles: { fontSize: 9, cellPadding: 5 },
-    alternateRowStyles: { fillColor: [249, 251, 253] },
-    bodyStyles: { textColor: [34, 39, 46] },
-  });
-
-  const expenseStart = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? dailyDetailsStart + 38;
+  const expenseStart = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 272;
   doc.setTextColor(22, 28, 36);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
@@ -184,6 +127,7 @@ async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse
     styles: { fontSize: 9, cellPadding: 5 },
     alternateRowStyles: { fillColor: [255, 250, 245] },
     bodyStyles: { textColor: [34, 39, 46] },
+    showFoot: "lastPage",
   });
 
   const revenueStart = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? expenseStart + 38;
@@ -216,6 +160,7 @@ async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse
     styles: { fontSize: 9, cellPadding: 5 },
     alternateRowStyles: { fillColor: [247, 255, 250] },
     bodyStyles: { textColor: [34, 39, 46] },
+    showFoot: "lastPage",
   });
 
   const filename = `monthly-report-${monthLabel.replace(/\s+/g, "-").toLowerCase()}.pdf`;
