@@ -10,7 +10,7 @@ const navItems = [
   { label: "Update a Record", path: "/records/update", icon: Edit, adminOnly: true },
   { label: "View Records", path: "/records", icon: FileText },
   { label: "Support", path: "/contact", icon: User },
-  { label: "Entry Report", path: "/reports", icon: BarChart3 },
+  { label: "Reports", path: "/reports", icon: BarChart3 },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
