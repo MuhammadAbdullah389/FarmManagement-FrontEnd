@@ -13,6 +13,10 @@ function sumLineItems(items: { amount: number }[]) {
   return items.reduce((total, item) => total + Number(item.amount || 0), 0);
 }
 
+function isHrSyncedItem(item: { readonly?: boolean; source?: string }) {
+  return Boolean(item.readonly || item.source === "hr");
+}
+
 async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse) {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import("jspdf"),
@@ -97,29 +101,40 @@ async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse
     showFoot: "lastPage",
   });
 
-  const expenseStart = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 272;
+  const expenseEntries = report.records.flatMap((record) =>
+    (record.expenses || []).map((item) => ({ date: record.date, item })),
+  );
+  const manualExpenseEntries = expenseEntries.filter((entry) => !isHrSyncedItem(entry.item));
+  const hrExpenseEntries = expenseEntries.filter((entry) => isHrSyncedItem(entry.item));
+
+  const revenueEntries = report.records.flatMap((record) =>
+    (record.revenues || []).map((item) => ({ date: record.date, item })),
+  );
+  const manualRevenueEntries = revenueEntries.filter((entry) => !isHrSyncedItem(entry.item));
+  const hrRevenueEntries = revenueEntries.filter((entry) => isHrSyncedItem(entry.item));
+
+  let sectionStart = ((doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 272) + 28;
+
   doc.setTextColor(22, 28, 36);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("Expense Details", margin, expenseStart + 28);
-
-  const expenseRows = report.records.flatMap((record) =>
-    (record.expenses || []).map((item) => [
-      record.date,
-      item.description || "-",
-      formatCurrency(Number(item.amount || 0)),
-    ]),
-  );
+  doc.text("Expense Details - Manual", margin, sectionStart);
 
   autoTable(doc, {
-    startY: expenseStart + 38,
+    startY: sectionStart + 10,
     margin: { left: margin, right: margin },
     head: [["Date", "Description", "Amount"]],
-    body: expenseRows.length > 0 ? expenseRows : [["-", "No expenses recorded", "0 PKR"]],
+    body: manualExpenseEntries.length > 0
+      ? manualExpenseEntries.map((entry) => [
+        entry.date,
+        entry.item.description || "-",
+        formatCurrency(Number(entry.item.amount || 0)),
+      ])
+      : [["-", "No manual expenses recorded", "0 PKR"]],
     foot: [[
       "TOTAL",
       "",
-      formatCurrency(sumLineItems(report.records.flatMap((record) => record.expenses || []))),
+      formatCurrency(sumLineItems(manualExpenseEntries.map((entry) => ({ amount: Number(entry.item.amount || 0) })))),
     ]],
     theme: "striped",
     headStyles: { fillColor: [180, 83, 9], textColor: 255, fontStyle: "bold" },
@@ -130,35 +145,86 @@ async function buildMonthlyPdf(monthLabel: string, report: MonthlyReportResponse
     showFoot: "lastPage",
   });
 
-  const revenueStart = (doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? expenseStart + 38;
-  doc.setTextColor(22, 28, 36);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("Revenue Details", margin, revenueStart + 28);
-
-  const revenueRows = report.records.flatMap((record) =>
-    (record.revenues || []).map((item) => [
-      record.date,
-      item.description || "-",
-      formatCurrency(Number(item.amount || 0)),
-    ]),
-  );
+  sectionStart = ((doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? sectionStart + 10) + 28;
+  doc.text("Expense Details - HR Synced", margin, sectionStart);
 
   autoTable(doc, {
-    startY: revenueStart + 38,
+    startY: sectionStart + 10,
     margin: { left: margin, right: margin },
     head: [["Date", "Description", "Amount"]],
-    body: revenueRows.length > 0 ? revenueRows : [["-", "No revenues recorded", "0 PKR"]],
+    body: hrExpenseEntries.length > 0
+      ? hrExpenseEntries.map((entry) => [
+        entry.date,
+        entry.item.description || "-",
+        formatCurrency(Number(entry.item.amount || 0)),
+      ])
+      : [["-", "No HR-synced expenses recorded", "0 PKR"]],
     foot: [[
       "TOTAL",
       "",
-      formatCurrency(sumLineItems(report.records.flatMap((record) => record.revenues || []))),
+      formatCurrency(sumLineItems(hrExpenseEntries.map((entry) => ({ amount: Number(entry.item.amount || 0) })))),
+    ]],
+    theme: "striped",
+    headStyles: { fillColor: [161, 98, 7], textColor: 255, fontStyle: "bold" },
+    footStyles: { fillColor: [254, 243, 199], textColor: [146, 64, 14], fontStyle: "bold" },
+    styles: { fontSize: 9, cellPadding: 5 },
+    alternateRowStyles: { fillColor: [255, 251, 235] },
+    bodyStyles: { textColor: [34, 39, 46] },
+    showFoot: "lastPage",
+  });
+
+  sectionStart = ((doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? sectionStart + 10) + 28;
+  doc.text("Revenue Details - Manual", margin, sectionStart);
+
+  autoTable(doc, {
+    startY: sectionStart + 10,
+    margin: { left: margin, right: margin },
+    head: [["Date", "Description", "Amount"]],
+    body: manualRevenueEntries.length > 0
+      ? manualRevenueEntries.map((entry) => [
+        entry.date,
+        entry.item.description || "-",
+        formatCurrency(Number(entry.item.amount || 0)),
+      ])
+      : [["-", "No manual revenues recorded", "0 PKR"]],
+    foot: [[
+      "TOTAL",
+      "",
+      formatCurrency(sumLineItems(manualRevenueEntries.map((entry) => ({ amount: Number(entry.item.amount || 0) })))),
     ]],
     theme: "striped",
     headStyles: { fillColor: [22, 163, 74], textColor: 255, fontStyle: "bold" },
     footStyles: { fillColor: [236, 253, 245], textColor: [22, 163, 74], fontStyle: "bold" },
     styles: { fontSize: 9, cellPadding: 5 },
     alternateRowStyles: { fillColor: [247, 255, 250] },
+    bodyStyles: { textColor: [34, 39, 46] },
+    showFoot: "lastPage",
+  });
+
+  sectionStart = ((doc as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? sectionStart + 10) + 28;
+  doc.text("Revenue Details - HR Synced", margin, sectionStart);
+
+  autoTable(doc, {
+    startY: sectionStart + 10,
+    margin: { left: margin, right: margin },
+    head: [["Date", "Description", "Amount"]],
+    body: hrRevenueEntries.length > 0
+      ? hrRevenueEntries.map((entry) => [
+        entry.date,
+        entry.item.description || "-",
+        formatCurrency(Number(entry.item.amount || 0)),
+      ])
+      : [["-", "No HR-synced revenues recorded", "0 PKR"]],
+    foot: [[
+      "TOTAL",
+      "",
+      formatCurrency(sumLineItems(hrRevenueEntries.map((entry) => ({ amount: Number(entry.item.amount || 0) })))),
+    ]],
+    theme: "striped",
+    headStyles: { fillColor: [5, 122, 85], textColor: 255, fontStyle: "bold" },
+    footStyles: { fillColor: [209, 250, 229], textColor: [6, 95, 70], fontStyle: "bold" },
+    styles: { fontSize: 9, cellPadding: 5 },
+    alternateRowStyles: { fillColor: [236, 253, 245] },
     bodyStyles: { textColor: [34, 39, 46] },
     showFoot: "lastPage",
   });

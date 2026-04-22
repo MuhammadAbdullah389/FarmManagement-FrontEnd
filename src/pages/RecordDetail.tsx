@@ -112,18 +112,26 @@ export default function RecordDetail() {
               <thead>
                 <tr className="bg-secondary/50">
                   <th className="py-2.5 px-4 text-left text-xs font-semibold text-muted-foreground uppercase">Description</th>
+                  <th className="py-2.5 px-4 text-left text-xs font-semibold text-muted-foreground uppercase">Source</th>
                   <th className="py-2.5 px-4 text-left text-xs font-semibold text-muted-foreground uppercase">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {record.expenses.length === 0 ? (
                   <tr className="border-t border-border/30">
-                    <td colSpan={2} className="py-3 px-4 text-muted-foreground text-center">No expenses</td>
+                    <td colSpan={3} className="py-3 px-4 text-muted-foreground text-center">No expenses</td>
                   </tr>
                 ) : (
                   record.expenses.map((exp, i) => (
                     <tr key={i} className="border-t border-border/30">
                       <td className="py-2.5 px-4 text-foreground">{exp.description}</td>
+                      <td className="py-2.5 px-4 text-foreground">
+                        {exp.readonly || exp.source === "hr" ? (
+                          <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">HR Read-only</span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">Manual</span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-4 text-foreground">{exp.amount.toLocaleString()} PKR</td>
                     </tr>
                   ))
@@ -141,18 +149,26 @@ export default function RecordDetail() {
               <thead>
                 <tr className="bg-secondary/50">
                   <th className="py-2.5 px-4 text-left text-xs font-semibold text-muted-foreground uppercase">Description</th>
+                  <th className="py-2.5 px-4 text-left text-xs font-semibold text-muted-foreground uppercase">Source</th>
                   <th className="py-2.5 px-4 text-left text-xs font-semibold text-muted-foreground uppercase">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {record.revenues.length === 0 ? (
                   <tr className="border-t border-border/30">
-                    <td colSpan={2} className="py-3 px-4 text-muted-foreground text-center">No revenue entries</td>
+                    <td colSpan={3} className="py-3 px-4 text-muted-foreground text-center">No revenue entries</td>
                   </tr>
                 ) : (
                   record.revenues.map((rev, i) => (
                     <tr key={i} className="border-t border-border/30">
                       <td className="py-2.5 px-4 text-foreground">{rev.description}</td>
+                      <td className="py-2.5 px-4 text-foreground">
+                        {rev.readonly || rev.source === "hr" ? (
+                          <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">HR Read-only</span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">Manual</span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-4 text-foreground">{rev.amount.toLocaleString()} PKR</td>
                     </tr>
                   ))

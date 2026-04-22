@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Edit, FileText, BarChart3, User, LogOut, Menu, X, Milk } from "lucide-react";
+import { Home, Edit, FileText, BarChart3, User, LogOut, Menu, X, Milk, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { api, type AuthUser } from "@/lib/api";
@@ -9,6 +9,8 @@ const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: Home, adminOnly: true },
   { label: "Update a Record", path: "/records/update", icon: Edit, adminOnly: true },
   { label: "View Records", path: "/records", icon: FileText },
+  { label: "HR", path: "/hr", icon: Users, adminOnly: true },
+  { label: "Superadmin", path: "/superadmin", icon: Users, superadminOnly: true },
   { label: "Support", path: "/contact", icon: User },
   { label: "Reports", path: "/reports", icon: BarChart3 },
 ];
@@ -18,7 +20,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [headerTime, setHeaderTime] = useState(new Date());
   const canManageRecords = currentUser?.role === "admin";
+  const canManageSuperadmin = currentUser?.role === "superadmin";
+  const homePath = canManageSuperadmin ? "/superadmin" : "/dashboard";
 
   useEffect(() => {
     let active = true;
@@ -43,6 +48,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeaderTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const headerDateLabel = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Karachi",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(headerTime);
+
+  const headerTimeLabel = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Karachi",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(headerTime);
+
   const handleLogout = async () => {
     try {
       await api.logout();
@@ -62,14 +89,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return location.pathname === path;
   };
 
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.adminOnly && !canManageRecords) return false;
+    if (item.superadminOnly && !canManageSuperadmin) return false;
+    if (item.path === "/dashboard" && canManageSuperadmin) return false;
+    if (item.path === "/records/update" && canManageSuperadmin) return false;
+    if (item.path === "/hr" && canManageSuperadmin) return false;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-background">
       {/* Top banner */}
-      <div className="bg-secondary/80 border-b border-border/50 py-3 text-center">
-        <Link to="/dashboard" className="inline-flex items-center gap-2">
-          <Milk className="h-5 w-5 text-primary" />
-          <span className="text-xl font-bold text-foreground">Farm Records System</span>
-        </Link>
+      <div className="bg-secondary/80 border-b border-border/50 py-3">
+        <div className="container flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <Link to={homePath} className="inline-flex items-center gap-2 min-w-0">
+            <Milk className="h-5 w-5 text-primary shrink-0" />
+            <span className="text-lg sm:text-xl font-bold text-foreground truncate">Farm Records System</span>
+          </Link>
+          <div className="rounded-full border border-border/60 bg-background/60 px-3 py-1 text-xs text-muted-foreground whitespace-nowrap sm:self-auto">
+            <span className="font-medium text-foreground">{headerDateLabel}</span>
+            <span className="mx-1 text-border">|</span>
+            <span>{headerTimeLabel}</span>
+          </div>
+        </div>
       </div>
 
       {/* Main Navbar */}
@@ -78,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center justify-between h-12">
             <div className="flex items-center gap-0 flex-1 justify-center">
-              {navItems.filter((item) => !item.adminOnly || canManageRecords).map((item) => {
+              {visibleNavItems.map((item) => {
                 const active = isActive(item.path);
                 return (
                   <Link key={item.path} to={item.path} className="flex-1 text-center">
@@ -126,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               )}
-              {navItems.filter((item) => !item.adminOnly || canManageRecords).map((item) => {
+              {visibleNavItems.map((item) => {
                 const active = isActive(item.path);
                 return (
                   <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}>

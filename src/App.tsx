@@ -12,12 +12,14 @@ import RecordDetail from "./pages/RecordDetail";
 import Reports from "./pages/Reports";
 import Contact from "./pages/Contact";
 import UpdateChoice from "./pages/UpdateChoice";
+import HR from "./pages/HR";
+import Superadmin from "./pages/Superadmin";
 import NotFound from "./pages/NotFound";
 import { api } from "@/lib/api";
 
 const queryClient = new QueryClient();
 
-type RequiredRole = "admin";
+type RequiredRole = "admin" | "superadmin";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: RequiredRole }) {
   const [checking, setChecking] = useState(true);
@@ -61,6 +63,9 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
   }
 
   if (requiredRole && currentRole !== requiredRole) {
+    if (currentRole === "superadmin") {
+      return <Navigate to="/superadmin" replace />;
+    }
     return <Navigate to="/records" replace />;
   }
 
@@ -81,6 +86,8 @@ const App = () => (
           <Route path="/records/update" element={<ProtectedRoute requiredRole="admin"><UpdateChoice /></ProtectedRoute>} />
           <Route path="/records/update/existing" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
           <Route path="/records/update/new" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
+          <Route path="/hr" element={<ProtectedRoute requiredRole="admin"><HR /></ProtectedRoute>} />
+          <Route path="/superadmin" element={<Superadmin />} />
           <Route path="/records/:date" element={<ProtectedRoute><RecordDetail /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />

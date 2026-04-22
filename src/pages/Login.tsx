@@ -26,8 +26,11 @@ export default function Login() {
     try {
       const response = await api.login(form);
       localStorage.setItem("auth_user", JSON.stringify(response.user));
-
-      navigate("/dashboard");
+      if (response.user.role === "superadmin") {
+        navigate("/superadmin");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to sign in";
       setError(message);

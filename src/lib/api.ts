@@ -9,7 +9,7 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: "user" | "admin";
+  role: "user" | "admin" | "superadmin";
 }
 
 interface ApiEnvelope<T> {
@@ -22,6 +22,10 @@ interface ApiEnvelope<T> {
 export interface LineItem {
   description: string;
   amount: number;
+  readonly?: boolean;
+  source?: string;
+  sourceRefType?: string | null;
+  sourceRefId?: string | null;
 }
 
 export interface DailyRecordRaw {
@@ -90,6 +94,125 @@ export interface MonthlyReportResponse {
 export interface DownloadedPdf {
   blob: Blob;
   filename: string;
+}
+
+export interface HrTransaction {
+  _id?: string;
+  type: "advance" | "payback";
+  amount: number;
+  note: string;
+  transactionDate: string;
+  settledAt?: string | null;
+}
+
+export interface HrSettlement {
+  _id?: string;
+  settlementDate: string;
+  daysWorked: number;
+  dailyRate: number;
+  basePay: number;
+  advancesTotal: number;
+  paybacksTotal: number;
+  netPay: number;
+  transactionCount: number;
+  approvedAt?: string | null;
+  executedAt?: string | null;
+}
+
+export interface HrSalaryAdjustment {
+  _id?: string;
+  previousPay: number;
+  increaseAmount: number;
+  newMonthlyPay: number;
+  effectiveDate: string;
+  note: string;
+}
+
+export interface HrEmployeeSummary {
+  id: string;
+  name: string;
+  monthlyPay: number;
+  joiningDate: string;
+  lastSettlementDate: string | null;
+  currentDue: number;
+  netBalance: number;
+  advancesTotal: number;
+  paybacksTotal: number;
+  pendingTransactions: number;
+  settlementCount: number;
+  employmentStatus: "active" | "left";
+  leftDate?: string | null;
+  payAtLeaving?: number | null;
+  netBalanceAtLeaving?: number | null;
+}
+
+export interface HrLeftEmployee {
+  id: string;
+  name: string;
+  joiningDate: string;
+  leftDate: string | null;
+  payAtLeaving: number;
+  netBalanceAtLeaving: number;
+}
+
+export interface HrEmployeeDetail {
+  id: string;
+  name: string;
+  monthlyPay: number;
+  joiningDate: string;
+  lastSettlementDate: string | null;
+  currentDue: number;
+  netBalance: number;
+  employmentStatus: "active" | "left";
+  leftDate?: string | null;
+  payAtLeaving?: number | null;
+  netBalanceAtLeaving?: number | null;
+  transactions: HrTransaction[];
+  settlements: HrSettlement[];
+  salaryAdjustments: HrSalaryAdjustment[];
+}
+
+export interface HrSettlementPreview {
+  employee: {
+    id: string;
+    name: string;
+    monthlyPay: number;
+    joiningDate: string;
+    lastSettlementDate: string | null;
+  };
+  snapshot: {
+    settlementDate: string;
+    lastSettlementDate: string;
+    daysWorked: number;
+    dailyRate: number;
+    basePay: number;
+    advancesTotal: number;
+    paybacksTotal: number;
+    netPay: number;
+    eligibleTransactions: HrTransaction[];
+  };
+  transactions: HrTransaction[];
+}
+
+export interface HrOverviewResponse {
+  employees: HrEmployeeSummary[];
+  leftEmployees: HrLeftEmployee[];
+  totals: {
+    totalEmployees: number;
+    totalMonthlyPay: number;
+    totalCurrentDue: number;
+    totalAdvances: number;
+    totalPaybacks: number;
+  };
+}
+
+export interface SuperadminFarm {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 function toMoneyMap(items: LineItem[]) {
@@ -375,5 +498,88 @@ export const api = {
       blob,
       filename: decodeURIComponent(encodedFilename || plainFilename || `monthly-report-${monthLabelOrCode}.pdf`),
     };
+  },
+
+  getHrOverview() {
+    return requestEnvelope<HrOverviewResponse>("/api/hr/overview").then((res) => res.data);
+  },
+
+  createHrEmployee(payload: { name: string; monthlyPay: number; joiningDate: string }) {
+    return requestEnvelope<{ employee: HrEmployeeSummary }>("/api/hr/employees", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, employee: res.data.employee }));
+  },
+
+  getHrEmployee(id: string) {
+    return requestEnvelope<{ employee: HrEmployeeDetail; snapshot: HrSettlementPreview["snapshot"] }>(`/api/hr/employees/${encodeURIComponent(id)}`)
+      .then((res) => res.data);
+  },
+
+  addHrTransaction(id: string, payload: { type: "advance" | "payback"; amount: number; note?: string; transactionDate?: string }) {
+    return requestEnvelope<{ employee: HrEmployeeSummary; transaction: HrTransaction }>(`/api/hr/employees/${encodeURIComponent(id)}/transactions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, employee: res.data.employee, transaction: res.data.transaction }));
+  },
+
+  updateHrTransaction(id: string, transactionId: string, payload: { type?: "advance" | "payback"; amount: number; note?: string; transactionDate?: string }) {
+    return requestEnvelope<{ employee: HrEmployeeSummary; transaction: HrTransaction }>(`/api/hr/employees/${encodeURIComponent(id)}/transactions/${encodeURIComponent(transactionId)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, employee: res.data.employee, transaction: res.data.transaction }));
+  },
+
+  previewHrSettlement(id: string, payload: { settlementDate?: string }) {
+    return requestEnvelope<HrSettlementPreview>(`/api/hr/employees/${encodeURIComponent(id)}/settlement-preview`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => res.data);
+  },
+
+  executeHrSettlement(id: string, payload: { settlementDate?: string }) {
+    return requestEnvelope<{ employee: HrEmployeeSummary; settlement: HrSettlement }>(`/api/hr/employees/${encodeURIComponent(id)}/settle`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, employee: res.data.employee, settlement: res.data.settlement }));
+  },
+
+  increaseHrPay(id: string, payload: { increaseAmount: number; note?: string; effectiveDate?: string }) {
+    return requestEnvelope<{ employee: HrEmployeeSummary; adjustment: HrSalaryAdjustment }>(`/api/hr/employees/${encodeURIComponent(id)}/increase-pay`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, employee: res.data.employee, adjustment: res.data.adjustment }));
+  },
+
+  markHrEmployeeLeft(id: string, payload: { leftDate?: string }) {
+    return requestEnvelope<{ employee: HrLeftEmployee }>(`/api/hr/employees/${encodeURIComponent(id)}/mark-left`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, employee: res.data.employee }));
+  },
+
+  getSuperadminFarms() {
+    return requestEnvelope<{ farms: SuperadminFarm[] }>("/api/superadmin/farms")
+      .then((res) => res.data.farms || []);
+  },
+
+  createSuperadminFarm(payload: { name: string; code: string; email: string; password: string }) {
+    return requestEnvelope<{ farm: SuperadminFarm }>("/api/superadmin/farms", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, farm: res.data.farm }));
+  },
+
+  updateSuperadminFarmStatus(id: string, payload: { isActive: boolean }) {
+    return requestEnvelope<{ farm: SuperadminFarm }>(`/api/superadmin/farms/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }).then((res) => ({ message: res.message, farm: res.data.farm }));
+  },
+
+  deleteSuperadminFarm(id: string) {
+    return requestEnvelope<null>(`/api/superadmin/farms/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }).then((res) => ({ message: res.message }));
   },
 };

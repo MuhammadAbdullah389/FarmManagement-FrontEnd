@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Save, Calendar, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, type LineItem } from "@/lib/api";
 
 interface DynamicField {
   id: number;
@@ -27,6 +27,8 @@ export default function NewRecord() {
   const [milkEvening, setMilkEvening] = useState("0");
   const [expenses, setExpenses] = useState<DynamicField[]>([]);
   const [revenues, setRevenues] = useState<DynamicField[]>([]);
+  const [readonlyExpenses, setReadonlyExpenses] = useState<LineItem[]>([]);
+  const [readonlyRevenues, setReadonlyRevenues] = useState<LineItem[]>([]);
   const [checkingDate, setCheckingDate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [recordExists, setRecordExists] = useState<boolean | null>(null);
@@ -44,6 +46,8 @@ export default function NewRecord() {
   useEffect(() => {
     if (!isExisting || !date) {
       setRecordExists(null);
+      setReadonlyExpenses([]);
+      setReadonlyRevenues([]);
       return;
     }
 
@@ -61,17 +65,26 @@ export default function NewRecord() {
         const record = await api.getRecord(resolved.formattedDate);
         if (!active) return;
 
+        const expenseItems = Array.isArray(record.expenses) ? record.expenses : [];
+        const revenueItems = Array.isArray(record.revenues) ? record.revenues : [];
+        const manualExpenses = expenseItems.filter((item) => !item.readonly && item.source !== "hr");
+        const manualRevenues = revenueItems.filter((item) => !item.readonly && item.source !== "hr");
+        const syncedExpenses = expenseItems.filter((item) => item.readonly || item.source === "hr");
+        const syncedRevenues = revenueItems.filter((item) => item.readonly || item.source === "hr");
+
         setMilkMorning(String(record.morningMilk));
         setMilkEvening(String(record.eveningMilk));
+        setReadonlyExpenses(syncedExpenses);
+        setReadonlyRevenues(syncedRevenues);
         setExpenses(
-          (record.expenses || []).map((item) => ({
+          manualExpenses.map((item) => ({
             id: Date.now() + Math.random(),
             description: item.description,
             value: String(item.amount),
           })),
         );
         setRevenues(
-          (record.revenues || []).map((item) => ({
+          manualRevenues.map((item) => ({
             id: Date.now() + Math.random(),
             description: item.description,
             value: String(item.amount),
@@ -83,6 +96,8 @@ export default function NewRecord() {
         setResolvedDate("");
         setMilkMorning("0");
         setMilkEvening("0");
+        setReadonlyExpenses([]);
+        setReadonlyRevenues([]);
         setExpenses([]);
         setRevenues([]);
         toast.error(err instanceof Error ? err.message : "Unable to load record for selected date");
@@ -207,6 +222,19 @@ export default function NewRecord() {
             {/* Expenses */}
             <div>
               <h2 className="text-lg font-semibold text-accent text-center mb-3">Expenses</h2>
+              {readonlyExpenses.length > 0 && (
+                <div className="mb-3 rounded-lg border border-border/30 bg-secondary/20 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">HR Synced (Read-only)</p>
+                  <div className="space-y-2">
+                    {readonlyExpenses.map((item, index) => (
+                      <div key={`readonly-exp-${index}`} className="flex items-center justify-between rounded-md border border-border/40 bg-secondary/40 px-3 py-2 text-sm">
+                        <span className="text-foreground">{item.description}</span>
+                        <span className="font-semibold text-destructive">{Number(item.amount || 0).toLocaleString()} PKR</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {expenses.length > 0 && (
                 <div className="space-y-3 mb-3">
                   {expenses.map((exp) => (
@@ -245,6 +273,19 @@ export default function NewRecord() {
             {/* Revenues */}
             <div>
               <h2 className="text-lg font-semibold text-accent text-center mb-3">Revenues</h2>
+              {readonlyRevenues.length > 0 && (
+                <div className="mb-3 rounded-lg border border-border/30 bg-secondary/20 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">HR Synced (Read-only)</p>
+                  <div className="space-y-2">
+                    {readonlyRevenues.map((item, index) => (
+                      <div key={`readonly-rev-${index}`} className="flex items-center justify-between rounded-md border border-border/40 bg-secondary/40 px-3 py-2 text-sm">
+                        <span className="text-foreground">{item.description}</span>
+                        <span className="font-semibold text-primary">{Number(item.amount || 0).toLocaleString()} PKR</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {revenues.length > 0 && (
                 <div className="space-y-3 mb-3">
                   {revenues.map((r) => (
