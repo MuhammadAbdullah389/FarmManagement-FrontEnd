@@ -15,6 +15,8 @@ export interface AuthUser {
   tenantId?: string | null;
   tenantCode?: string | null;
   tenantName?: string | null;
+  tenantIsActive?: boolean | null;
+  tenantSubscriptionExpiresAt?: string | null;
 }
 
 interface ApiEnvelope<T> {
@@ -251,6 +253,15 @@ export interface FarmExploreOverview {
     monthlyReportsCount: number;
   };
   latestRecords: DailyRecordRaw[];
+}
+
+export interface TenantUserSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 function toMoneyMap(items: LineItem[]) {
@@ -568,6 +579,12 @@ export const api = {
     }).then((res) => ({ message: res.message, employee: res.data.employee, transaction: res.data.transaction }));
   },
 
+  deleteHrTransaction(id: string, transactionId: string) {
+    return requestEnvelope<{ employee: HrEmployeeSummary }>(`/api/hr/employees/${encodeURIComponent(id)}/transactions/${encodeURIComponent(transactionId)}`, {
+      method: "DELETE",
+    }).then((res) => ({ message: res.message, employee: res.data.employee }));
+  },
+
   previewHrSettlement(id: string, payload: { settlementDate?: string }) {
     return requestEnvelope<HrSettlementPreview>(`/api/hr/employees/${encodeURIComponent(id)}/settlement-preview`, {
       method: "POST",
@@ -623,6 +640,29 @@ export const api = {
   getFarmExploreOverview(code: string) {
     return requestEnvelope<FarmExploreOverview>(`/api/superadmin/farms/${encodeURIComponent(code)}/overview`)
       .then((res) => res.data);
+  },
+
+  getTenantUsers() {
+    return requestEnvelope<{ users: TenantUserSummary[] }>("/api/admin/users")
+      .then((res) => res.data.users || []);
+  },
+
+  createTenantUser(payload: { name: string; email: string; password: string; role?: "user" | "admin" }) {
+    return requestEnvelope<{ user: TenantUserSummary }>("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role || "user",
+      }),
+    }).then((res) => ({ message: res.message, user: res.data.user }));
+  },
+
+  deleteTenantUser(id: string) {
+    return requestEnvelope<null>(`/api/admin/users/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }).then((res) => ({ message: res.message }));
   },
 
   deleteSuperadminFarm(id: string) {

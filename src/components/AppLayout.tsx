@@ -12,6 +12,7 @@ const navItems = [
   { label: "Update a Record", path: "/records/update", icon: Edit, adminOnly: true },
   { label: "View Records", path: "/records", icon: FileText },
   { label: "HR", path: "/hr", icon: Users, adminOnly: true },
+  { label: "Settings", path: "/settings", icon: Users, adminOnly: true },
   { label: "Support", path: "/contact", icon: User },
   { label: "Reports", path: "/reports", icon: BarChart3 },
 ];
@@ -71,6 +72,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     hour12: true,
   }).format(headerTime);
 
+  const tenantExpiryDate = currentUser?.tenantSubscriptionExpiresAt ? new Date(currentUser.tenantSubscriptionExpiresAt) : null;
+  const tenantExpiryLabel = tenantExpiryDate && !Number.isNaN(tenantExpiryDate.getTime())
+    ? new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Karachi",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(tenantExpiryDate)
+    : null;
+
   const handleLogout = async () => {
     try {
       await api.logout();
@@ -98,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       {/* Top banner */}
       <div className="bg-secondary/80 border-b border-border/50 py-3">
         <div className="container flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -197,9 +211,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </nav>
 
-      <main className="container py-6 animate-fade-in">
+      <main className="container flex-1 py-6 animate-fade-in">
         {children}
       </main>
+
+      <footer className="mt-auto border-t border-border/50 bg-secondary/50 py-3">
+        <div className="container flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>© 2026 Advanced FMS</span>
+          {tenantExpiryLabel && currentUser?.role !== "superadmin" && (
+            <span className="font-medium text-foreground">
+              {currentUser?.tenantIsActive === false ? "Subscription expired" : "Subscription active until"} {tenantExpiryLabel}
+            </span>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }

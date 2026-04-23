@@ -16,12 +16,23 @@ import UpdateChoice from "./pages/UpdateChoice";
 import HR from "./pages/HR";
 import Superadmin from "./pages/Superadmin";
 import ExploreFarm from "./pages/ExploreFarm";
+import Settings from "./pages/Settings";
+import SubscriptionExpired from "./pages/SubscriptionExpired";
 import NotFound from "./pages/NotFound";
 import { api } from "@/lib/api";
 
 const queryClient = new QueryClient();
 
 type RequiredRole = "admin" | "superadmin";
+
+function isExpiredTenant(user: { role?: string; tenantIsActive?: boolean | null; tenantSubscriptionExpiresAt?: string | null } | null) {
+  if (!user || user.role === "superadmin") {
+    return false;
+  }
+
+  const expiryDate = user.tenantSubscriptionExpiresAt ? new Date(user.tenantSubscriptionExpiresAt) : null;
+  return user.tenantIsActive === false || Boolean(expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate.getTime() <= Date.now());
+}
 
 function hasRoleAccess(currentRole: string | null, requiredRole?: RequiredRole) {
   if (!requiredRole) {
@@ -38,7 +49,7 @@ function hasRoleAccess(currentRole: string | null, requiredRole?: RequiredRole) 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: RequiredRole }) {
   const [checking, setChecking] = useState(true);
   const [authorized, setAuthorized] = useState(Boolean(localStorage.getItem("auth_user")));
-  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ role: string | null; expired: boolean }>({ role: null, expired: false });
 
   useEffect(() => {
     let active = true;
@@ -49,12 +60,12 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
         if (!active) return;
         localStorage.setItem("auth_user", JSON.stringify(user));
         setAuthorized(true);
-        setCurrentRole(user.role);
+        setCurrentUser({ role: user.role, expired: isExpiredTenant(user) });
       } catch {
         if (!active) return;
         localStorage.removeItem("auth_user");
         setAuthorized(false);
-        setCurrentRole(null);
+        setCurrentUser({ role: null, expired: false });
       } finally {
         if (active) {
           setChecking(false);
@@ -76,8 +87,12 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
     return <Navigate to="/login" replace />;
   }
 
-  if (!hasRoleAccess(currentRole, requiredRole)) {
-    if (currentRole === "superadmin") {
+  if (currentUser.expired) {
+    return <Navigate to="/subscription-expired" replace />;
+  }
+
+  if (!hasRoleAccess(currentUser.role, requiredRole)) {
+    if (currentUser.role === "superadmin") {
       return <Navigate to="/superadmin" replace />;
     }
     return <Navigate to="/records" replace />;
@@ -95,12 +110,14 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/subscription-expired" element={<SubscriptionExpired />} />
           <Route path="/dashboard" element={<ProtectedRoute requiredRole="admin"><Dashboard /></ProtectedRoute>} />
           <Route path="/records" element={<ProtectedRoute><Records /></ProtectedRoute>} />
           <Route path="/records/update" element={<ProtectedRoute requiredRole="admin"><UpdateChoice /></ProtectedRoute>} />
           <Route path="/records/update/existing" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
           <Route path="/records/update/new" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
           <Route path="/hr" element={<ProtectedRoute requiredRole="admin"><HR /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute requiredRole="admin"><Settings /></ProtectedRoute>} />
           <Route path="/superadmin" element={<ProtectedRoute requiredRole="superadmin"><Superadmin /></ProtectedRoute>} />
           <Route path="/superadmin/explore" element={<ProtectedRoute requiredRole="superadmin"><ExploreFarm /></ProtectedRoute>} />
           <Route path="/records/:date" element={<ProtectedRoute><RecordDetail /></ProtectedRoute>} />

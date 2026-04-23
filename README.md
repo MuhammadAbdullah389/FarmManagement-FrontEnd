@@ -8,6 +8,9 @@ This app connects to the backend API for:
 - daily farm records
 - monthly reports and PDF export
 - HR employee and transaction workflows
+- tenant-aware access control for farm admins and superadmins
+- farm creation, activation, and deletion flows for superadmins
+- tenant settings and farm user management for admins
 
 ## Tech Stack
 
@@ -17,6 +20,7 @@ This app connects to the backend API for:
 - React Router
 - TanStack Query
 - Tailwind CSS + Radix UI components
+- shadcn/ui dialog, calendar, and form primitives
 - Sonner toasts
 - jsPDF + jspdf-autotable
 - Vitest + Testing Library
@@ -90,6 +94,7 @@ npm run test:watch
 Public:
 
 - `/login`
+- `/subscription-expired`
 
 Authenticated:
 
@@ -105,6 +110,12 @@ Admin only:
 - `/records/update/existing`
 - `/records/update/new`
 - `/hr`
+- `/settings`
+
+Superadmin only:
+
+- `/superadmin`
+- `/superadmin/explore`
 
 ## Core Features
 
@@ -113,6 +124,15 @@ Admin only:
 - Login with backend cookie session (`tId`)
 - Protected route checks with `/api/auth/me`
 - Role-based route access (`admin` vs user)
+- Superadmins skip tenant selection at login and land on the dedicated Superadmin dashboard
+- Inactive tenants can still sign in, but the app redirects them to a single subscription-expired screen and blocks the rest of the app
+- The footer shows the subscription expiry label for farm-admin sessions
+
+### Tenant Settings
+
+- Admins can view tenant users by name and email
+- Admins can add or delete tenant users from the Settings page
+- Superadmin accounts are filtered out of the tenant settings list
 
 ### Daily Records
 
@@ -134,6 +154,17 @@ Admin only:
 - Settlement preview and execution
 - Pay increases
 - Mark employee as left
+- Delete unsettled transactions with daily record and monthly report sync
+
+### Superadmin Farm Management
+
+- Dedicated Superadmin dashboard with mobile-friendly cards and summary stats
+- Create farm tenants and admin credentials
+- View and explore existing farms from the Superadmin area
+- Toggle farm active state
+- Activate a farm with a calendar date picker plus time selection dialog
+- Delete a farm only after typed verification and a second confirmation popup
+- Deactivate a farm immediately with one click
 
 ## HR Readonly Sync In Daily Logs
 
@@ -144,6 +175,7 @@ HR transactions are reflected in daily records and reports.
 - In update form, synced HR lines are shown in readonly sections.
 - In record detail, source badges show `HR Read-only` vs `Manual`.
 - Monthly report details include HR readonly labels.
+- Deleting an unsettled HR transaction removes its synced readonly daily line and updates monthly totals.
 
 Important:
 
@@ -173,4 +205,8 @@ Important:
 3. Report mismatch concerns:
 - Backend now maintains incremental monthly consistency rebuild logic
 - Re-open report after latest write actions
+
+4. Subscription expired screen keeps showing:
+- Confirm the tenant is marked active in the Superadmin dashboard
+- Check the `inactiveUntil` expiry value for the farm tenant
 

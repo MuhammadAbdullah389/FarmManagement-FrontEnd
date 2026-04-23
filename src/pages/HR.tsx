@@ -71,6 +71,8 @@ export default function HR() {
   const [editTransactionOpen, setEditTransactionOpen] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editTransactionForm, setEditTransactionForm] = useState({ type: "advance" as TransactionType, amount: "", note: "", transactionDate: todayInputValue() });
+  const [deleteTransactionOpen, setDeleteTransactionOpen] = useState(false);
+  const [pendingDeleteTransaction, setPendingDeleteTransaction] = useState<HrEmployeeDetail["transactions"][number] | null>(null);
   const [settlementDate, setSettlementDate] = useState(todayInputValue());
   const [leftDate, setLeftDate] = useState(todayInputValue());
   const [confirmLeftOpen, setConfirmLeftOpen] = useState(false);
@@ -309,6 +311,42 @@ export default function HR() {
       setSelectedEmployee(refreshed.employee);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Unable to update transaction");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (transaction: HrEmployeeDetail["transactions"][number]) => {
+    if (!selectedEmployeeId || !transaction._id) {
+      toast.error("Transaction id missing");
+      return;
+    }
+
+    if (transaction.settledAt) {
+      toast.error("Settled transaction cannot be deleted");
+      return;
+    }
+
+    setPendingDeleteTransaction(transaction);
+    setDeleteTransactionOpen(true);
+  };
+
+  const confirmDeleteTransaction = async () => {
+    if (!selectedEmployeeId || !pendingDeleteTransaction?._id) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await api.deleteHrTransaction(selectedEmployeeId, pendingDeleteTransaction._id);
+      toast.success(result.message || "Transaction deleted");
+      setDeleteTransactionOpen(false);
+      setPendingDeleteTransaction(null);
+      await loadEmployees();
+      const refreshed = await api.getHrEmployee(selectedEmployeeId);
+      setSelectedEmployee(refreshed.employee);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to delete transaction");
     } finally {
       setBusy(false);
     }
@@ -838,9 +876,14 @@ export default function HR() {
                                       {transaction.type === "advance" ? "-" : "+"}{formatMoney(transaction.amount)}
                                     </div>
                                     {!transaction.settledAt && (
-                                      <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => openEditTransactionDialog(transaction)}>
-                                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                                      </Button>
+                                      <div className="flex items-center gap-2">
+                                        <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => openEditTransactionDialog(transaction)}>
+                                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                                        </Button>
+                                        <Button type="button" variant="destructive" size="sm" className="h-8 px-2" disabled={busy} onClick={() => handleDeleteTransaction(transaction)}>
+                                          Delete
+                                        </Button>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -970,6 +1013,39 @@ export default function HR() {
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </form>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog
+                    open={deleteTransactionOpen}
+                    onOpenChange={(open) => {
+                      setDeleteTransactionOpen(open);
+                      if (!open) {
+                        setPendingDeleteTransaction(null);
+                      }
+                    }}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Delete this unsettled transaction? It will also be removed from the daily record and monthly report.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <div className="rounded-lg border border-border/60 bg-secondary/20 px-3 py-2 text-sm">
+                        <div className="font-medium text-foreground capitalize">{pendingDeleteTransaction?.type}</div>
+                        <div className="text-muted-foreground">
+                          {pendingDeleteTransaction?.transactionDate} {pendingDeleteTransaction?.note ? `· ${pendingDeleteTransaction.note}` : ""}
+                        </div>
+                      </div>
+
+                      <AlertDialogFooter>
+                        <AlertDialogCancel type="button" disabled={busy}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction type="button" disabled={busy} onClick={() => { void confirmDeleteTransaction(); }}>
+                          {busy ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
 

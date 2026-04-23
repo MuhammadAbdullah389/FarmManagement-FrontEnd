@@ -16,6 +16,15 @@ function normalizeTenantCodeNumber(value: string) {
   return String(Number(digits)).padStart(3, "0");
 }
 
+function isExpiredTenant(user: { role?: string; tenantIsActive?: boolean | null; tenantSubscriptionExpiresAt?: string | null }) {
+  if (user.role === "superadmin") {
+    return false;
+  }
+
+  const expiryDate = user.tenantSubscriptionExpiresAt ? new Date(user.tenantSubscriptionExpiresAt) : null;
+  return user.tenantIsActive === false || Boolean(expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate.getTime() <= Date.now());
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -50,6 +59,8 @@ export default function Login() {
       localStorage.setItem("auth_user", JSON.stringify(response.user));
       if (response.user.role === "superadmin") {
         navigate("/superadmin");
+      } else if (isExpiredTenant(response.user)) {
+        navigate("/subscription-expired", { replace: true });
       } else {
         navigate("/dashboard");
       }
