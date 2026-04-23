@@ -3,6 +3,8 @@ import { getApiBaseUrl, request } from "@/lib/apiClient";
 export interface LoginPayload {
   email: string;
   password: string;
+  tenantPrefix?: "ALPHA" | "BETA" | "CHARLIE" | "DELTA";
+  tenantCodeNumber?: string;
 }
 
 export interface AuthUser {
@@ -10,6 +12,9 @@ export interface AuthUser {
   name: string;
   email: string;
   role: "user" | "admin" | "superadmin";
+  tenantId?: string | null;
+  tenantCode?: string | null;
+  tenantName?: string | null;
 }
 
 interface ApiEnvelope<T> {
@@ -211,8 +216,41 @@ export interface SuperadminFarm {
   name: string;
   code: string;
   isActive: boolean;
+  isActiveNow?: boolean;
+  inactiveUntil?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface SuperadminReport {
+  totalFarms: number;
+  activeFarms: number;
+  inactiveFarms: number;
+  totalUsers: number;
+  totalAdmins: number;
+  totalSuperadmins: number;
+  totalUserLogs: number;
+  totalSubmissions: number;
+  totalHrEmployees: number;
+  totalMonthlyReports: number;
+}
+
+export interface FarmExploreOverview {
+  farm: {
+    id: string;
+    name: string;
+    code: string;
+    isActive: boolean;
+    isActiveNow: boolean;
+    inactiveUntil?: string | null;
+  };
+  totals: {
+    usersCount: number;
+    recordsCount: number;
+    hrEmployeesCount: number;
+    monthlyReportsCount: number;
+  };
+  latestRecords: DailyRecordRaw[];
 }
 
 function toMoneyMap(items: LineItem[]) {
@@ -570,11 +608,21 @@ export const api = {
     }).then((res) => ({ message: res.message, farm: res.data.farm }));
   },
 
-  updateSuperadminFarmStatus(id: string, payload: { isActive: boolean }) {
+  updateSuperadminFarmStatus(id: string, payload: { isActive: boolean; inactiveUntil?: string | null }) {
     return requestEnvelope<{ farm: SuperadminFarm }>(`/api/superadmin/farms/${encodeURIComponent(id)}/status`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     }).then((res) => ({ message: res.message, farm: res.data.farm }));
+  },
+
+  getSuperadminReport() {
+    return requestEnvelope<SuperadminReport>("/api/superadmin/report")
+      .then((res) => res.data);
+  },
+
+  getFarmExploreOverview(code: string) {
+    return requestEnvelope<FarmExploreOverview>(`/api/superadmin/farms/${encodeURIComponent(code)}/overview`)
+      .then((res) => res.data);
   },
 
   deleteSuperadminFarm(id: string) {

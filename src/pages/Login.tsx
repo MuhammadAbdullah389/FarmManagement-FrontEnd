@@ -6,17 +6,34 @@ import { Label } from "@/components/ui/label";
 import { Milk, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 
+const TENANT_PREFIXES = ["ALPHA", "BETA", "CHARLIE", "DELTA"] as const;
+
+function normalizeTenantCodeNumber(value: string) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 3);
+  if (!digits) {
+    return "";
+  }
+  return String(Number(digits)).padStart(3, "0");
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    tenantPrefix: "ALPHA" as typeof TENANT_PREFIXES[number],
+    tenantCodeNumber: "",
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedCodeNumber = normalizeTenantCodeNumber(form.tenantCodeNumber);
+
     if (!form.email || !form.password) {
-      setError("Please fill in all fields");
+      setError("Email and password are required");
       return;
     }
 
@@ -24,7 +41,12 @@ export default function Login() {
     setError("");
 
     try {
-      const response = await api.login(form);
+      const response = await api.login({
+        email: form.email,
+        password: form.password,
+        tenantPrefix: normalizedCodeNumber ? form.tenantPrefix : undefined,
+        tenantCodeNumber: normalizedCodeNumber || undefined,
+      });
       localStorage.setItem("auth_user", JSON.stringify(response.user));
       if (response.user.role === "superadmin") {
         navigate("/superadmin");
@@ -64,6 +86,31 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tenant-prefix" className="text-sm text-muted-foreground">Tenant Identifier</Label>
+              <div className="grid grid-cols-[1fr_120px] gap-2">
+                <select
+                  id="tenant-prefix"
+                  value={form.tenantPrefix}
+                  onChange={(e) => setForm({ ...form, tenantPrefix: e.target.value as typeof TENANT_PREFIXES[number] })}
+                  className="h-10 rounded-md border border-input bg-secondary px-3 text-sm"
+                >
+                  {TENANT_PREFIXES.map((prefix) => (
+                    <option key={prefix} value={prefix}>{prefix}</option>
+                  ))}
+                </select>
+                <Input
+                  id="tenant-code-number"
+                  inputMode="numeric"
+                  maxLength={3}
+                  placeholder="001 (optional for superadmin)"
+                  value={form.tenantCodeNumber}
+                  onChange={(e) => setForm({ ...form, tenantCodeNumber: e.target.value.replace(/\D/g, "").slice(0, 3) })}
+                  className="h-10 bg-secondary border-border focus:border-primary focus:ring-primary/20"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Farm admins must provide tenant. Superadmin can leave it blank.</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm text-muted-foreground">Email</Label>
               <Input

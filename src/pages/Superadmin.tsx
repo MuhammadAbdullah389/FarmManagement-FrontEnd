@@ -3,7 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, type SuperadminFarm } from "@/lib/api";
+import { api, type SuperadminFarm, type SuperadminReport } from "@/lib/api";
 import { toast } from "sonner";
 import { Building2, Plus, RefreshCw, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 
@@ -59,8 +59,10 @@ function buildTenantCode(prefix: TenantPrefix, codeNumber: string) {
 
 export default function Superadmin() {
   const [farms, setFarms] = useState<SuperadminFarm[]>([]);
+  const [report, setReport] = useState<SuperadminReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [inactiveUntilByFarm, setInactiveUntilByFarm] = useState<Record<string, string>>({});
   const [newFarm, setNewFarm] = useState({
     name: "",
     adminEmail: "",
@@ -83,8 +85,19 @@ export default function Superadmin() {
     }
   };
 
+  const loadReport = async () => {
+    try {
+      const data = await api.getSuperadminReport();
+      setReport(data);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to load superadmin report");
+      setReport(null);
+    }
+  };
+
   useEffect(() => {
     loadFarms();
+    loadReport();
   }, []);
 
   const handleCreateFarm = async (e: React.FormEvent) => {
@@ -128,6 +141,7 @@ export default function Superadmin() {
         codeNumber: "",
       }));
       await loadFarms();
+      await loadReport();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Unable to create farm");
     } finally {
@@ -138,9 +152,15 @@ export default function Superadmin() {
   const handleToggleFarm = async (farm: SuperadminFarm) => {
     setBusy(true);
     try {
-      const result = await api.updateSuperadminFarmStatus(farm.id, { isActive: !farm.isActive });
-      toast.success(result.message || `Farm ${farm.isActive ? "deactivated" : "activated"}`);
+      const turningActive = !farm.isActiveNow;
+      const untilValue = inactiveUntilByFarm[farm.id] || null;
+      const result = await api.updateSuperadminFarmStatus(farm.id, {
+        isActive: turningActive,
+        inactiveUntil: turningActive ? null : (untilValue || null),
+      });
+      toast.success(result.message || `Farm ${turningActive ? "activated" : "deactivated"}`);
       await loadFarms();
+      await loadReport();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Unable to change farm status");
     } finally {
@@ -157,6 +177,7 @@ export default function Superadmin() {
       const result = await api.deleteSuperadminFarm(farm.id);
       toast.success(result.message || "Farm deleted");
       await loadFarms();
+      await loadReport();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Unable to delete farm");
     } finally {
@@ -184,9 +205,37 @@ export default function Superadmin() {
             <p className="text-sm text-muted-foreground">View all farms, add new farms, delete farms, and toggle active status.</p>
           </div>
           <Button type="button" variant="outline" onClick={loadFarms} disabled={loading || busy}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh Farms
           </Button>
         </div>
+
+        {report && (
+          <div className="glass-card p-5">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Platform Report</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="rounded-lg border border-border/50 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Total Farms</p>
+                <p className="text-lg font-semibold text-foreground">{report.totalFarms}</p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Active Farms</p>
+                <p className="text-lg font-semibold text-foreground">{report.activeFarms}</p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Inactive Farms</p>
+                <p className="text-lg font-semibold text-foreground">{report.inactiveFarms}</p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Total Users</p>
+                <p className="text-lg font-semibold text-foreground">{report.totalUsers}</p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-secondary/20 p-3">
+                <p className="text-xs text-muted-foreground">Total Logs</p>
+                <p className="text-lg font-semibold text-foreground">{report.totalUserLogs}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="glass-card p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -194,7 +243,7 @@ export default function Superadmin() {
             <h2 className="text-lg font-semibold text-foreground">Add Farm</h2>
           </div>
 
-          <form onSubmit={handleCreateFarm} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <form onSubmit={handleCreateFarm} autoComplete="off" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Farm Name</Label>
               <Input
@@ -207,7 +256,9 @@ export default function Superadmin() {
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Admin Email</Label>
               <Input
+                name="farm-admin-email"
                 type="email"
+                autoComplete="off"
                 value={newFarm.adminEmail}
                 onChange={(e) => setNewFarm((prev) => ({ ...prev, adminEmail: e.target.value }))}
                 placeholder="owner@farm.com"
@@ -217,7 +268,9 @@ export default function Superadmin() {
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Admin Password</Label>
               <Input
+                name="farm-admin-password"
                 type="password"
+                autoComplete="new-password"
                 value={newFarm.adminPassword}
                 onChange={(e) => setNewFarm((prev) => ({ ...prev, adminPassword: e.target.value }))}
                 placeholder="Set initial password"
@@ -279,14 +332,23 @@ export default function Superadmin() {
                   <div className="min-w-0">
                     <div className="font-semibold text-foreground truncate">{farm.name}</div>
                     <div className="text-xs text-muted-foreground">Code: {farm.code}</div>
+                    {farm.inactiveUntil && (
+                      <div className="text-xs text-muted-foreground mt-1">Inactive Until: {new Date(farm.inactiveUntil).toLocaleString()}</div>
+                    )}
                     <div className="text-xs mt-1">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${farm.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"}`}>
-                        {farm.isActive ? "Active" : "Inactive"}
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${farm.isActiveNow ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"}`}>
+                        {farm.isActiveNow ? "Active" : "Inactive"}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+                    <Input
+                      type="datetime-local"
+                      value={inactiveUntilByFarm[farm.id] || ""}
+                      onChange={(e) => setInactiveUntilByFarm((prev) => ({ ...prev, [farm.id]: e.target.value }))}
+                      className="h-8 w-[210px]"
+                    />
                     <Button
                       type="button"
                       variant="outline"
@@ -294,7 +356,7 @@ export default function Superadmin() {
                       disabled={busy}
                       onClick={() => handleToggleFarm(farm)}
                     >
-                      {farm.isActive ? (
+                      {farm.isActiveNow ? (
                         <><ShieldX className="h-4 w-4 mr-1" /> Set Inactive</>
                       ) : (
                         <><ShieldCheck className="h-4 w-4 mr-1" /> Set Active</>

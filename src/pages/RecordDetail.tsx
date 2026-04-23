@@ -127,7 +127,7 @@ export default function RecordDetail() {
                       <td className="py-2.5 px-4 text-foreground">{exp.description}</td>
                       <td className="py-2.5 px-4 text-foreground">
                         {exp.readonly || exp.source === "hr" ? (
-                          <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">HR Read-only</span>
+                          <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">HR</span>
                         ) : (
                           <span className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">Manual</span>
                         )}
@@ -164,7 +164,7 @@ export default function RecordDetail() {
                       <td className="py-2.5 px-4 text-foreground">{rev.description}</td>
                       <td className="py-2.5 px-4 text-foreground">
                         {rev.readonly || rev.source === "hr" ? (
-                          <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">HR Read-only</span>
+                          <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">HR</span>
                         ) : (
                           <span className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">Manual</span>
                         )}

@@ -15,12 +15,25 @@ import Contact from "./pages/Contact";
 import UpdateChoice from "./pages/UpdateChoice";
 import HR from "./pages/HR";
 import Superadmin from "./pages/Superadmin";
+import ExploreFarm from "./pages/ExploreFarm";
 import NotFound from "./pages/NotFound";
 import { api } from "@/lib/api";
 
 const queryClient = new QueryClient();
 
 type RequiredRole = "admin" | "superadmin";
+
+function hasRoleAccess(currentRole: string | null, requiredRole?: RequiredRole) {
+  if (!requiredRole) {
+    return true;
+  }
+
+  if (requiredRole === "superadmin") {
+    return currentRole === "superadmin";
+  }
+
+  return currentRole === "admin" || currentRole === "superadmin";
+}
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: RequiredRole }) {
   const [checking, setChecking] = useState(true);
@@ -63,7 +76,7 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && currentRole !== requiredRole) {
+  if (!hasRoleAccess(currentRole, requiredRole)) {
     if (currentRole === "superadmin") {
       return <Navigate to="/superadmin" replace />;
     }
@@ -88,7 +101,8 @@ const App = () => (
           <Route path="/records/update/existing" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
           <Route path="/records/update/new" element={<ProtectedRoute requiredRole="admin"><NewRecord /></ProtectedRoute>} />
           <Route path="/hr" element={<ProtectedRoute requiredRole="admin"><HR /></ProtectedRoute>} />
-          <Route path="/superadmin" element={<Superadmin />} />
+          <Route path="/superadmin" element={<ProtectedRoute requiredRole="superadmin"><Superadmin /></ProtectedRoute>} />
+          <Route path="/superadmin/explore" element={<ProtectedRoute requiredRole="superadmin"><ExploreFarm /></ProtectedRoute>} />
           <Route path="/records/:date" element={<ProtectedRoute><RecordDetail /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />

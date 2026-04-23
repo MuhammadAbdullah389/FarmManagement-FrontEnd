@@ -6,11 +6,12 @@ import { api, type AuthUser } from "@/lib/api";
 import { toast } from "sonner";
 
 const navItems = [
+  { label: "Superadmin", path: "/superadmin", icon: Users, superadminOnly: true },
+  { label: "Explore Farm", path: "/superadmin/explore", icon: FileText, superadminOnly: true },
   { label: "Dashboard", path: "/dashboard", icon: Home, adminOnly: true },
   { label: "Update a Record", path: "/records/update", icon: Edit, adminOnly: true },
   { label: "View Records", path: "/records", icon: FileText },
   { label: "HR", path: "/hr", icon: Users, adminOnly: true },
-  { label: "Superadmin", path: "/superadmin", icon: Users, superadminOnly: true },
   { label: "Support", path: "/contact", icon: User },
   { label: "Reports", path: "/reports", icon: BarChart3 },
 ];
@@ -90,11 +91,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const visibleNavItems = navItems.filter((item) => {
+    if (canManageSuperadmin && !item.superadminOnly) return false;
     if (item.adminOnly && !canManageRecords) return false;
     if (item.superadminOnly && !canManageSuperadmin) return false;
-    if (item.path === "/dashboard" && canManageSuperadmin) return false;
-    if (item.path === "/records/update" && canManageSuperadmin) return false;
-    if (item.path === "/hr" && canManageSuperadmin) return false;
     return true;
   });
 
@@ -137,6 +136,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-2 rounded-full border border-border/60 bg-secondary/40 px-3 py-1 text-xs text-muted-foreground">
                   <User className="h-3.5 w-3.5" />
                   <span className="max-w-[180px] truncate font-medium text-foreground">{currentUser.name}</span>
+                  {currentUser.tenantCode && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                      {currentUser.tenantCode}
+                    </span>
+                  )}
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     {currentUser.role}
                   </span>
@@ -165,6 +169,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <User className="h-3.5 w-3.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium text-foreground">{currentUser.name}</div>
+                    {currentUser.tenantCode && (
+                      <div className="text-[10px] uppercase tracking-wide text-amber-700">{currentUser.tenantCode}</div>
+                    )}
                     <div className="text-[10px] uppercase tracking-wide text-primary">{currentUser.role}</div>
                   </div>
                 </div>
